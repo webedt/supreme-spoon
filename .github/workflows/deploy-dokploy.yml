@@ -94,6 +94,17 @@ jobs:
           else
             echo "📦 Application not found. Creating new application..."
 
+            # Extract repository parts
+            REPO_OWNER="${GITHUB_REPOSITORY%%/*}"
+            REPO_NAME="${GITHUB_REPOSITORY##*/}"
+
+            echo "Repository Details:"
+            echo "  - Full: ${GITHUB_REPOSITORY}"
+            echo "  - Owner: ${REPO_OWNER}"
+            echo "  - Name: ${REPO_NAME}"
+            echo "  - Branch: ${GITHUB_BRANCH}"
+            echo "  - GitHub App ID: ${DOKPLOY_GITHUB_APP_ID}"
+
             # Create new application
             CREATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
               "${DOKPLOY_URL}/api/trpc/application.create" \
@@ -107,8 +118,8 @@ jobs:
                   \"environmentId\": \"${DOKPLOY_ENVIRONMENT_ID}\",
                   \"applicationType\": \"github\",
                   \"sourceType\": \"github\",
-                  \"repository\": \"${GITHUB_REPOSITORY}\",
-                  \"owner\": \"${GITHUB_REPOSITORY%%/*}\",
+                  \"repository\": \"${REPO_NAME}\",
+                  \"owner\": \"${REPO_OWNER}\",
                   \"branch\": \"${GITHUB_BRANCH}\",
                   \"buildType\": \"nixpacks\",
                   \"githubAppId\": \"${DOKPLOY_GITHUB_APP_ID}\",
