@@ -1,0 +1,184 @@
+#!/bin/bash
+
+# Dokploy ID Fetcher
+# This script helps you get the Project ID and Application ID from your Dokploy instance
+# to configure GitHub Secrets for automated deployments
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Function to print colored output
+print_info() {
+    echo -e "${BLUE}ℹ${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}✗${NC} $1"
+}
+
+print_header() {
+    echo -e "\n${BLUE}═══════════════════════════════════════════════════════${NC}"
+    echo -e "${BLUE}  $1${NC}"
+    echo -e "${BLUE}═══════════════════════════════════════════════════════${NC}\n"
+}
+
+# Check if jq is installed
+if ! command -v jq &> /dev/null; then
+    print_warning "jq is not installed. Output will be raw JSON."
+    print_info "Install jq for formatted output: sudo apt-get install jq (Ubuntu/Debian) or brew install jq (macOS)"
+    USE_JQ=false
+else
+    USE_JQ=true
+fi
+
+# Get Dokploy URL from environment or prompt
+if [ -z "$DOKPLOY_URL" ]; then
+    print_header "Dokploy Configuration"
+    echo -n "Enter your Dokploy URL (e.g., https://dokploy.yourdomain.com): "
+    read DOKPLOY_URL
+fi
+
+# Ensure URL doesn't end with /api
+DOKPLOY_URL=$(echo "$DOKPLOY_URL" | sed 's/\/api$//')
+
+# Get API Key from environment or prompt
+if [ -z "$DOKPLOY_API" ]; then
+    echo -n "Enter your Dokploy API Key: "
+    read -s DOKPLOY_API
+    echo
+fi
+
+print_info "Fetching projects from Dokploy..."
+
+# Fetch all projects
+RESPONSE=$(curl -s -w "\n%{http_code}" -X 'GET' \
+    "${DOKPLOY_URL}/api/project.all" \
+    -H 'accept: application/json' \
+    -H "x-api-key: ${DOKPLOY_API}")
+
+HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+BODY=$(echo "$RESPONSE" | sed '$d')
+
+# Check HTTP response code
+if [ "$HTTP_CODE" -ne 200 ]; then
+    print_error "Failed to fetch projects (HTTP $HTTP_CODE)"
+    echo "$BODY"
+    exit 1
+fi
+
+print_success "Successfully fetched projects from Dokploy"
+
+# Parse and display projects
+print_header "Available Projects"
+
+if [ "$USE_JQ" = true ]; then
+    # Count projects
+    PROJECT_COUNT=$(echo "$BODY" | jq '. | length')
+    print_info "Found $PROJECT_COUNT project(s)\n"
+
+    # Display projects
+    echo "$BODY" | jq -r '.[] | "\(.name)\n  Project ID: \(.projectId)\n  Description: \(.description // "No description")\n"'
+
+    # Find "Sessions" project
+    print_header "GitHub Secrets Configuration"
+
+    SESSIONS_PROJECT_ID=$(echo "$BODY" | jq -r '.[] | select(.name == "Sessions") | .projectId')
+
+    if [ -n "$SESSIONS_PROJECT_ID" ] && [ "$SESSIONS_PROJECT_ID" != "null" ]; then
+        print_success "Found 'Sessions' project!"
+        echo ""
+        echo "Add this to GitHub Secrets as DOKPLOY_PROJECT_ID:"
+        echo -e "${GREEN}${SESSIONS_PROJECT_ID}${NC}"
+        echo ""
+
+        # Get applications in Sessions project
+        print_info "Applications in 'Sessions' project:\n"
+
+        APPS=$(echo "$BODY" | jq -r '.[] | select(.name == "Sessions") | .applications[]? | "  - \(.name)\n    Application ID: \(.applicationId)\n    Type: \(.applicationType // "N/A")\n    Status: \(.applicationStatus // "N/A")\n"')
+
+        if [ -n "$APPS" ]; then
+            echo "$APPS"
+        else
+            print_warning "No applications found in 'Sessions' project"
+            print_info "You may need to create an application first"
+        fi
+
+        # Also check for compose services, databases, etc.
+        COMPOSE=$(echo "$BODY" | jq -r '.[] | select(.name == "Sessions") | .compose[]? | "  - \(.name) (Compose)\n    Compose ID: \(.composeId)\n"')
+        if [ -n "$COMPOSE" ]; then
+            echo -e "\n${BLUE}Compose Services:${NC}"
+            echo "$COMPOSE"
+        fi
+
+        POSTGRES=$(echo "$BODY" | jq -r '.[] | select(.name == "Sessions") | .postgres[]? | "  - \(.name) (PostgreSQL)\n    Postgres ID: \(.postgresId)\n"')
+        if [ -n "$POSTGRES" ]; then
+            echo -e "\n${BLUE}PostgreSQL Databases:${NC}"
+            echo "$POSTGRES"
+        fi
+
+        MYSQL=$(echo "$BODY" | jq -r '.[] | select(.name == "Sessions") | .mysql[]? | "  - \(.name) (MySQL)\n    MySQL ID: \(.mysqlId)\n"')
+        if [ -n "$MYSQL" ]; then
+            echo -e "\n${BLUE}MySQL Databases:${NC}"
+            echo "$MYSQL"
+        fi
+
+        REDIS=$(echo "$BODY" | jq -r '.[] | select(.name == "Sessions") | .redis[]? | "  - \(.name) (Redis)\n    Redis ID: \(.redisId)\n"')
+        if [ -n "$REDIS" ]; then
+            echo -e "\n${BLUE}Redis Instances:${NC}"
+            echo "$REDIS"
+        fi
+
+    else
+        print_warning "No 'Sessions' project found"
+        print_info "Please create a 'Sessions' project in Dokploy or use a different project name"
+    fi
+
+    # Summary of required GitHub Secrets
+    print_header "Required GitHub Secrets Summary"
+    echo "Configure these secrets in: Settings > Secrets and variables > Actions"
+    echo ""
+    echo "1. DOKPLOY_URL"
+    echo -e "   Value: ${GREEN}${DOKPLOY_URL}${NC}"
+    echo ""
+    echo "2. DOKPLOY_API_KEY"
+    echo -e "   Value: ${GREEN}[Your API Key - keep this secret]${NC}"
+    echo ""
+    echo "3. DOKPLOY_PROJECT_ID"
+    if [ -n "$SESSIONS_PROJECT_ID" ] && [ "$SESSIONS_PROJECT_ID" != "null" ]; then
+        echo -e "   Value: ${GREEN}${SESSIONS_PROJECT_ID}${NC}"
+    else
+        echo -e "   Value: ${YELLOW}[Get this from the project list above]${NC}"
+    fi
+    echo ""
+    echo "4. DOKPLOY_APPLICATION_ID"
+    echo -e "   Value: ${YELLOW}[Get this from the application list above]${NC}"
+    echo ""
+
+else
+    # jq not available - show raw JSON
+    echo "Raw JSON response (install jq for formatted output):"
+    echo "$BODY" | python3 -m json.tool 2>/dev/null || echo "$BODY"
+fi
+
+print_header "Next Steps"
+echo "1. Copy the Project ID and Application ID from above"
+echo "2. Go to your GitHub repository"
+echo "3. Navigate to: Settings > Secrets and variables > Actions"
+echo "4. Add the four required secrets (see summary above)"
+echo "5. Push code to trigger the deployment workflow"
+echo ""
+print_info "For more information, see .github/DEPLOYMENT.md"
