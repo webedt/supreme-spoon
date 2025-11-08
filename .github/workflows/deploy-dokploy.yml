@@ -47,8 +47,8 @@ jobs:
           # Get short SHA
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
 
-          # Generate application name
-          APP_NAME="${OWNER}-${REPO}-${BRANCH}-${SHORT_SHA}"
+          # Generate application name (without SHA for stable domain)
+          APP_NAME="${OWNER}-${REPO}-${BRANCH}"
 
           # Output metadata
           echo "owner=${OWNER}" >> $GITHUB_OUTPUT
