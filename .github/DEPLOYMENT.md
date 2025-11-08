@@ -73,30 +73,26 @@ The ID of the application in Dokploy that will receive deployments.
 
 The workflow runs on:
 
-- **Push events** to branches:
-  - `main`
-  - `develop`
-  - Any branch matching `feature/**`
-
-- **Pull requests** to:
-  - `main`
-  - `develop`
-
+- **Push events** to any branch
+- **Pull requests** to any branch
 - **Manual trigger** via workflow dispatch
 
 ## Customization
 
-### Modify Trigger Branches
+### Limit to Specific Branches
 
-Edit `.github/workflows/deploy-dokploy.yml`:
+If you want to restrict deployments to specific branches, edit `.github/workflows/deploy-dokploy.yml`:
 
 ```yaml
 on:
   push:
     branches:
-      - main           # Add or remove branches
+      - main           # Only deploy from these branches
       - staging
       - production
+  pull_request:
+    branches:
+      - main
 ```
 
 ### Change Node.js Version
