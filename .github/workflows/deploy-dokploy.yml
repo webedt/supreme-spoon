@@ -66,7 +66,7 @@ jobs:
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
           DOKPLOY_PROJECT_ID: ${{ vars.DOKPLOY_PROJECT_ID }}
           DOKPLOY_ENVIRONMENT_ID: ${{ vars.DOKPLOY_ENVIRONMENT_ID }}
-          DOKPLOY_GITHUB_APP_ID: ${{ vars.DOKPLOY_GITHUB_APP_ID }}
+          DOKPLOY_GITHUB_ID: ${{ vars.DOKPLOY_GITHUB_ID }}
           APP_NAME: ${{ steps.metadata.outputs.app_name }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_BRANCH: ${{ github.ref_name }}
@@ -103,9 +103,9 @@ jobs:
             echo "  - Owner: ${REPO_OWNER}"
             echo "  - Name: ${REPO_NAME}"
             echo "  - Branch: ${GITHUB_BRANCH}"
-            echo "  - GitHub App ID: ${DOKPLOY_GITHUB_APP_ID}"
+            echo "  - GitHub ID: ${DOKPLOY_GITHUB_ID}"
 
-            # Create new application
+            # Create new application (basic fields only)
             CREATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
               "${DOKPLOY_URL}/api/trpc/application.create" \
               -H 'accept: application/json' \
@@ -115,15 +115,7 @@ jobs:
                 \"json\": {
                   \"name\": \"${APP_NAME}\",
                   \"projectId\": \"${DOKPLOY_PROJECT_ID}\",
-                  \"environmentId\": \"${DOKPLOY_ENVIRONMENT_ID}\",
-                  \"applicationType\": \"github\",
-                  \"sourceType\": \"github\",
-                  \"repository\": \"${REPO_NAME}\",
-                  \"owner\": \"${REPO_OWNER}\",
-                  \"branch\": \"${GITHUB_BRANCH}\",
-                  \"buildType\": \"nixpacks\",
-                  \"githubAppId\": \"${DOKPLOY_GITHUB_APP_ID}\",
-                  \"port\": 3000
+                  \"environmentId\": \"${DOKPLOY_ENVIRONMENT_ID}\"
                 }
               }")
 
@@ -136,6 +128,35 @@ jobs:
             else
               echo "❌ Failed to create application (HTTP ${CREATE_HTTP_CODE})"
               echo "Response: ${CREATE_BODY}"
+              exit 1
+            fi
+
+            # Configure GitHub provider for the application
+            echo "🔗 Configuring GitHub provider..."
+            GITHUB_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
+              "${DOKPLOY_URL}/api/trpc/application.saveGithubProvider" \
+              -H 'accept: application/json' \
+              -H 'Content-Type: application/json' \
+              -H "x-api-key: ${DOKPLOY_API_KEY}" \
+              -d "{
+                \"json\": {
+                  \"applicationId\": \"${APP_ID}\",
+                  \"githubId\": \"${DOKPLOY_GITHUB_ID}\",
+                  \"repository\": \"${REPO_NAME}\",
+                  \"owner\": \"${REPO_OWNER}\",
+                  \"branch\": \"${GITHUB_BRANCH}\",
+                  \"buildPath\": \"/\"
+                }
+              }")
+
+            GITHUB_HTTP_CODE=$(echo "$GITHUB_RESPONSE" | tail -n1)
+            GITHUB_BODY=$(echo "$GITHUB_RESPONSE" | sed '$d')
+
+            if [ "$GITHUB_HTTP_CODE" -ge 200 ] && [ "$GITHUB_HTTP_CODE" -lt 300 ]; then
+              echo "✅ GitHub provider configured successfully"
+            else
+              echo "❌ Failed to configure GitHub provider (HTTP ${GITHUB_HTTP_CODE})"
+              echo "Response: ${GITHUB_BODY}"
               exit 1
             fi
 
