@@ -89,6 +89,7 @@ The workflow automatically deploys to Dokploy when code is pushed to any branch.
    - `DOKPLOY_URL` - Your Dokploy instance URL
    - `DOKPLOY_PROJECT_ID` - ID of the "Sessions" project
    - `DOKPLOY_ENVIRONMENT_ID` - ID of the target environment
+   - `DOKPLOY_GITHUB_APP_ID` - ID of your Dokploy GitHub App
 
    **Secrets tab:**
    - `DOKPLOY_API_KEY` - Your Dokploy API key

@@ -66,6 +66,7 @@ jobs:
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
           DOKPLOY_PROJECT_ID: ${{ vars.DOKPLOY_PROJECT_ID }}
           DOKPLOY_ENVIRONMENT_ID: ${{ vars.DOKPLOY_ENVIRONMENT_ID }}
+          DOKPLOY_GITHUB_APP_ID: ${{ vars.DOKPLOY_GITHUB_APP_ID }}
           APP_NAME: ${{ steps.metadata.outputs.app_name }}
           GITHUB_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
           GITHUB_BRANCH: ${{ github.ref_name }}
@@ -105,6 +106,7 @@ jobs:
                   \"projectId\": \"${DOKPLOY_PROJECT_ID}\",
                   \"environmentId\": \"${DOKPLOY_ENVIRONMENT_ID}\",
                   \"applicationType\": \"github\",
+                  \"githubAppId\": \"${DOKPLOY_GITHUB_APP_ID}\",
                   \"repository\": \"${GITHUB_REPO_URL}\",
                   \"branch\": \"${GITHUB_BRANCH}\",
                   \"buildType\": \"nixpacks\",

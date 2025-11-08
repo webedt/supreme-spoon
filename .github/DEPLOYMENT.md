@@ -70,6 +70,17 @@ Using the same `project.all` API call as above, look within your project for the
 }
 ```
 
+#### `DOKPLOY_GITHUB_APP_ID`
+The ID of your Dokploy GitHub App integration.
+
+**How to find:**
+1. Log into your Dokploy instance
+2. Navigate to Settings > GitHub
+3. Find your GitHub App connection
+4. Copy the GitHub App ID
+
+This is required for Dokploy to access your GitHub repositories via the GitHub App.
+
 ### GitHub Secrets
 
 Click on the **Secrets** tab and add this repository secret:
