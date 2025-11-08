@@ -101,14 +101,27 @@ if [ "$USE_JQ" = true ]; then
     if [ -n "$SESSIONS_PROJECT_ID" ] && [ "$SESSIONS_PROJECT_ID" != "null" ]; then
         print_success "Found 'Sessions' project!"
         echo ""
-        echo "Add this to GitHub Secrets as DOKPLOY_PROJECT_ID:"
+        echo "Add this to GitHub Variables as DOKPLOY_PROJECT_ID:"
         echo -e "${GREEN}${SESSIONS_PROJECT_ID}${NC}"
         echo ""
 
-        # Get applications in Sessions project
+        # Get environments in Sessions project
+        print_info "Environments in 'Sessions' project:\n"
+
+        ENVS=$(echo "$BODY" | jq -r '.[] | select(.name == "Sessions") | .environments[]? | "  - \(.name)\n    Environment ID: \(.environmentId)\n"')
+
+        if [ -n "$ENVS" ]; then
+            echo "$ENVS"
+        else
+            print_warning "No environments found in 'Sessions' project"
+        fi
+
+        echo ""
+
+        # Get applications in Sessions project (from all environments)
         print_info "Applications in 'Sessions' project:\n"
 
-        APPS=$(echo "$BODY" | jq -r '.[] | select(.name == "Sessions") | .applications[]? | "  - \(.name)\n    Application ID: \(.applicationId)\n    Type: \(.applicationType // "N/A")\n    Status: \(.applicationStatus // "N/A")\n"')
+        APPS=$(echo "$BODY" | jq -r '.[] | select(.name == "Sessions") | .environments[]? | .applications[]? | "  - \(.name) (Environment: \(.environmentName // "default"))\n    Application ID: \(.applicationId)\n    Type: \(.applicationType // "N/A")\n    Status: \(.applicationStatus // "N/A")\n"')
 
         if [ -n "$APPS" ]; then
             echo "$APPS"
@@ -147,24 +160,31 @@ if [ "$USE_JQ" = true ]; then
         print_info "Please create a 'Sessions' project in Dokploy or use a different project name"
     fi
 
-    # Summary of required GitHub Secrets
-    print_header "Required GitHub Secrets Summary"
-    echo "Configure these secrets in: Settings > Secrets and variables > Actions"
+    # Summary of required GitHub configuration
+    print_header "Required GitHub Configuration Summary"
+    echo "Configure these in: Settings > Secrets and variables > Actions"
+    echo ""
+    echo -e "${BLUE}GitHub Variables (Variables tab):${NC}"
     echo ""
     echo "1. DOKPLOY_URL"
     echo -e "   Value: ${GREEN}${DOKPLOY_URL}${NC}"
     echo ""
-    echo "2. DOKPLOY_API_KEY"
-    echo -e "   Value: ${GREEN}[Your API Key - keep this secret]${NC}"
-    echo ""
-    echo "3. DOKPLOY_PROJECT_ID"
+    echo "2. DOKPLOY_PROJECT_ID"
     if [ -n "$SESSIONS_PROJECT_ID" ] && [ "$SESSIONS_PROJECT_ID" != "null" ]; then
         echo -e "   Value: ${GREEN}${SESSIONS_PROJECT_ID}${NC}"
     else
         echo -e "   Value: ${YELLOW}[Get this from the project list above]${NC}"
     fi
     echo ""
-    echo "4. DOKPLOY_APPLICATION_ID"
+    echo "3. DOKPLOY_ENVIRONMENT_ID"
+    echo -e "   Value: ${YELLOW}[Get this from the environment list above]${NC}"
+    echo ""
+    echo -e "${BLUE}GitHub Secrets (Secrets tab):${NC}"
+    echo ""
+    echo "4. DOKPLOY_API_KEY"
+    echo -e "   Value: ${GREEN}[Your API Key - keep this secret]${NC}"
+    echo ""
+    echo "5. DOKPLOY_APPLICATION_ID"
     echo -e "   Value: ${YELLOW}[Get this from the application list above]${NC}"
     echo ""
 
@@ -175,10 +195,11 @@ else
 fi
 
 print_header "Next Steps"
-echo "1. Copy the Project ID and Application ID from above"
+echo "1. Copy the IDs from above"
 echo "2. Go to your GitHub repository"
 echo "3. Navigate to: Settings > Secrets and variables > Actions"
-echo "4. Add the four required secrets (see summary above)"
-echo "5. Push code to trigger the deployment workflow"
+echo "4. Add Variables (Variables tab): DOKPLOY_URL, DOKPLOY_PROJECT_ID, DOKPLOY_ENVIRONMENT_ID"
+echo "5. Add Secrets (Secrets tab): DOKPLOY_API_KEY, DOKPLOY_APPLICATION_ID"
+echo "6. Push code to trigger the deployment workflow"
 echo ""
 print_info "For more information, see .github/DEPLOYMENT.md"

@@ -18,30 +18,26 @@ For example: `webedt-supreme-spoon-main-abc1234`
 2. A Dokploy project (e.g., "Sessions") where applications will be deployed
 3. An application created in Dokploy for deployment
 
-## Required GitHub Secrets
+## Required Configuration
 
-Configure the following secrets in your GitHub repository settings (`Settings > Secrets and variables > Actions`):
+You need to configure both **GitHub Variables** (for non-sensitive data) and **GitHub Secrets** (for sensitive data).
 
-### `DOKPLOY_URL`
+Navigate to: `Settings > Secrets and variables > Actions`
+
+### GitHub Variables
+
+Click on the **Variables** tab and add these repository variables:
+
+#### `DOKPLOY_URL`
 The base URL of your Dokploy instance.
 
 **Example values:**
 - `https://dokploy.yourdomain.com`
 - `http://your-vps-ip:3000`
 
-**Important:** Include the protocol (`https://` or `http://`) and trailing slash if required by your instance.
+**Important:** Include the protocol (`https://` or `http://`).
 
-### `DOKPLOY_API_KEY`
-Your Dokploy API key for authentication.
-
-**How to generate:**
-1. Navigate to your Dokploy instance
-2. Go to `/settings/profile`
-3. Find the **API/CLI Section**
-4. Click to generate a new API token
-5. Copy the generated token
-
-### `DOKPLOY_PROJECT_ID`
+#### `DOKPLOY_PROJECT_ID`
 The ID of the Dokploy project where applications will be deployed (e.g., "Sessions" project).
 
 **How to find:**
@@ -54,20 +50,56 @@ curl -X 'GET' \
 
 Look for the `projectId` field in the response for your "Sessions" project.
 
-### `DOKPLOY_APPLICATION_ID`
+#### `DOKPLOY_ENVIRONMENT_ID`
+The ID of the environment within the project (e.g., "production" environment).
+
+**How to find:**
+Using the same `project.all` API call as above, look within your project for the `environments` array. Find your target environment (e.g., "production") and copy the `environmentId` value.
+
+**Example response structure:**
+```json
+{
+  "projectId": "l4UTuhy2g13e-g_X7Pz5g",
+  "name": "Sessions",
+  "environments": [
+    {
+      "environmentId": "BFHBS_W-a2D1WaSKpTgAN",
+      "name": "production"
+    }
+  ]
+}
+```
+
+### GitHub Secrets
+
+Click on the **Secrets** tab and add these repository secrets:
+
+#### `DOKPLOY_API_KEY`
+Your Dokploy API key for authentication.
+
+**How to generate:**
+1. Navigate to your Dokploy instance
+2. Go to `/settings/profile`
+3. Find the **API/CLI Section**
+4. Click to generate a new API token
+5. Copy the generated token
+
+#### `DOKPLOY_APPLICATION_ID`
 The ID of the application in Dokploy that will receive deployments.
 
 **How to find:**
 1. Use the same `project.all` API call as above
-2. Find your project and look for the application
-3. Copy the `applicationId` value
+2. Find your project and environment
+3. Look for the application in the environment
+4. Copy the `applicationId` value
 
 **Alternatively**, create a new application in Dokploy:
 1. Log into Dokploy
 2. Navigate to your "Sessions" project
-3. Create a new application
-4. Configure it for your repository
-5. Copy the application ID
+3. Select the appropriate environment
+4. Create a new application
+5. Configure it for your repository
+6. Copy the application ID
 
 ## Workflow Triggers
 

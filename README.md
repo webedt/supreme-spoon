@@ -80,11 +80,16 @@ The workflow automatically deploys to Dokploy when code is pushed to specific br
    .github/get-dokploy-ids.sh
    ```
 
-2. **Configure GitHub Secrets:**
-   Go to `Settings > Secrets and variables > Actions` and add:
+2. **Configure GitHub Variables and Secrets:**
+   Go to `Settings > Secrets and variables > Actions`
+
+   **Variables tab:**
    - `DOKPLOY_URL` - Your Dokploy instance URL
-   - `DOKPLOY_API_KEY` - Your Dokploy API key
    - `DOKPLOY_PROJECT_ID` - ID of the "Sessions" project
+   - `DOKPLOY_ENVIRONMENT_ID` - ID of the target environment
+
+   **Secrets tab:**
+   - `DOKPLOY_API_KEY` - Your Dokploy API key
    - `DOKPLOY_APPLICATION_ID` - ID of the target application
 
 3. **Push to deploy:**
