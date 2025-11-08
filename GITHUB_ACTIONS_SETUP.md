@@ -22,7 +22,25 @@ You need to configure the following in your GitHub repository settings:
 
 The `DOKPLOY_GITHUB_ID` is Dokploy's internal identifier (UUID) for your GitHub integration, **not** the GitHub App ID.
 
-### Method 1: Using the Dokploy API
+### Quick Method: Use the Helper Script
+
+This repository includes a helper script that automatically fetches your GitHub ID:
+
+```bash
+# Set your environment variables
+export DOKPLOY_URL='https://dokploy.etdofresh.com'
+export DOKPLOY_API_KEY='your-api-key-here'
+
+# Run the script
+./get-dokploy-github-id.sh
+```
+
+The script will:
+- Fetch all GitHub providers from your Dokploy instance
+- Display them in a formatted table
+- Show you exactly what to copy for `DOKPLOY_GITHUB_ID`
+
+### Manual Method: Using the Dokploy API
 
 1. Make sure you have your `DOKPLOY_API_KEY`
 
