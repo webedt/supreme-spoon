@@ -145,7 +145,8 @@ jobs:
                   \"repository\": \"${REPO_NAME}\",
                   \"owner\": \"${REPO_OWNER}\",
                   \"branch\": \"${GITHUB_BRANCH}\",
-                  \"buildPath\": \"/\"
+                  \"buildPath\": \"/\",
+                  \"enableSubmodules\": false
                 }
               }")
 
