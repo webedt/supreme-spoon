@@ -67,29 +67,101 @@ jobs:
           DOKPLOY_PROJECT_ID: ${{ vars.DOKPLOY_PROJECT_ID }}
           DOKPLOY_ENVIRONMENT_ID: ${{ vars.DOKPLOY_ENVIRONMENT_ID }}
           APP_NAME: ${{ steps.metadata.outputs.app_name }}
+          GITHUB_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+          GITHUB_BRANCH: ${{ github.ref_name }}
         run: |
+          echo "🔍 Checking if application '${APP_NAME}' exists..."
+
           # Get all projects to find if our application exists
-          RESPONSE=$(curl -s -X 'GET' \
+          PROJECTS=$(curl -s -X 'GET' \
             "${DOKPLOY_URL}/api/project.all" \
             -H 'accept: application/json' \
             -H "x-api-key: ${DOKPLOY_API_KEY}")
 
-          echo "Projects response received"
+          # Try to find existing application by name
+          APP_ID=$(echo "$PROJECTS" | jq -r --arg name "$APP_NAME" '
+            .[] | select(.projectId == env.DOKPLOY_PROJECT_ID) |
+            .environments[]? | select(.environmentId == env.DOKPLOY_ENVIRONMENT_ID) |
+            .applications[]? | select(.name == $name) | .applicationId
+          ' | head -n1)
 
-          # Try to find existing application ID
-          # This is a placeholder - actual implementation depends on Dokploy API
-          # For now, we'll use a predefined APPLICATION_ID from secrets
-          APP_ID="${{ secrets.DOKPLOY_APPLICATION_ID }}"
+          if [ -n "$APP_ID" ] && [ "$APP_ID" != "null" ]; then
+            echo "✅ Found existing application: ${APP_ID}"
+          else
+            echo "📦 Application not found. Creating new application..."
 
-          if [ -z "$APP_ID" ]; then
-            echo "ERROR: DOKPLOY_APPLICATION_ID secret not set"
-            echo "Please create an application in Dokploy first and add its ID to GitHub secrets"
-            exit 1
+            # Create new application
+            CREATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
+              "${DOKPLOY_URL}/api/trpc/application.create" \
+              -H 'accept: application/json' \
+              -H 'Content-Type: application/json' \
+              -H "x-api-key: ${DOKPLOY_API_KEY}" \
+              -d "{
+                \"json\": {
+                  \"name\": \"${APP_NAME}\",
+                  \"projectId\": \"${DOKPLOY_PROJECT_ID}\",
+                  \"environmentId\": \"${DOKPLOY_ENVIRONMENT_ID}\",
+                  \"applicationType\": \"github\",
+                  \"repository\": \"${GITHUB_REPO_URL}\",
+                  \"branch\": \"${GITHUB_BRANCH}\",
+                  \"buildType\": \"nixpacks\",
+                  \"port\": 3000
+                }
+              }")
+
+            CREATE_HTTP_CODE=$(echo "$CREATE_RESPONSE" | tail -n1)
+            CREATE_BODY=$(echo "$CREATE_RESPONSE" | sed '$d')
+
+            if [ "$CREATE_HTTP_CODE" -ge 200 ] && [ "$CREATE_HTTP_CODE" -lt 300 ]; then
+              APP_ID=$(echo "$CREATE_BODY" | jq -r '.result.data.json.applicationId // .result.data.applicationId // .applicationId')
+              echo "✅ Application created successfully: ${APP_ID}"
+            else
+              echo "❌ Failed to create application (HTTP ${CREATE_HTTP_CODE})"
+              echo "Response: ${CREATE_BODY}"
+              exit 1
+            fi
+
+            # Add domain to the application
+            DOMAIN="${APP_NAME}.etdofresh.com"
+            echo "🌐 Adding domain: https://${DOMAIN}"
+
+            DOMAIN_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
+              "${DOKPLOY_URL}/api/trpc/application.addDomain" \
+              -H 'accept: application/json' \
+              -H 'Content-Type: application/json' \
+              -H "x-api-key: ${DOKPLOY_API_KEY}" \
+              -d "{
+                \"json\": {
+                  \"applicationId\": \"${APP_ID}\",
+                  \"host\": \"${DOMAIN}\",
+                  \"port\": 3000,
+                  \"https\": true,
+                  \"path\": \"/\"
+                }
+              }")
+
+            DOMAIN_HTTP_CODE=$(echo "$DOMAIN_RESPONSE" | tail -n1)
+            DOMAIN_BODY=$(echo "$DOMAIN_RESPONSE" | sed '$d')
+
+            if [ "$DOMAIN_HTTP_CODE" -ge 200 ] && [ "$DOMAIN_HTTP_CODE" -lt 300 ]; then
+              echo "✅ Domain added successfully: https://${DOMAIN}"
+            else
+              echo "⚠️  Warning: Failed to add domain (HTTP ${DOMAIN_HTTP_CODE})"
+              echo "Response: ${DOMAIN_BODY}"
+              echo "You may need to add the domain manually"
+            fi
           fi
 
           echo "application_id=${APP_ID}" >> $GITHUB_OUTPUT
-          echo "Using Application ID: ${APP_ID}"
-          echo "Using Environment ID: ${DOKPLOY_ENVIRONMENT_ID}"
+          echo "domain=${APP_NAME}.etdofresh.com" >> $GITHUB_OUTPUT
+          echo ""
+          echo "📋 Application Details:"
+          echo "  - ID: ${APP_ID}"
+          echo "  - Name: ${APP_NAME}"
+          echo "  - Domain: https://${APP_NAME}.etdofresh.com"
+          echo "  - Port: 3000"
+          echo "  - Environment: ${DOKPLOY_ENVIRONMENT_ID}"
+
 
       - name: Deploy to Dokploy
         env:
@@ -134,6 +206,8 @@ jobs:
           echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Application Name**: ${{ steps.metadata.outputs.app_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Application ID**: ${{ steps.dokploy_app.outputs.application_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Domain**: https://${{ steps.dokploy_app.outputs.domain }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Owner**: ${{ steps.metadata.outputs.owner }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Repository**: ${{ steps.metadata.outputs.repo }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Branch**: ${{ steps.metadata.outputs.branch }}" >> $GITHUB_STEP_SUMMARY
@@ -144,6 +218,8 @@ jobs:
 
           if [ "${{ job.status }}" = "success" ]; then
             echo "✅ Deployment completed successfully" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "🌐 **Access your application at**: https://${{ steps.dokploy_app.outputs.domain }}" >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ Deployment failed" >> $GITHUB_STEP_SUMMARY
           fi

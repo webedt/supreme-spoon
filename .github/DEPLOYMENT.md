@@ -72,7 +72,7 @@ Using the same `project.all` API call as above, look within your project for the
 
 ### GitHub Secrets
 
-Click on the **Secrets** tab and add these repository secrets:
+Click on the **Secrets** tab and add this repository secret:
 
 #### `DOKPLOY_API_KEY`
 Your Dokploy API key for authentication.
@@ -84,22 +84,23 @@ Your Dokploy API key for authentication.
 4. Click to generate a new API token
 5. Copy the generated token
 
-#### `DOKPLOY_APPLICATION_ID`
-The ID of the application in Dokploy that will receive deployments.
+**Note**: The workflow will automatically create applications in Dokploy as needed. You don't need to manually create applications or provide application IDs.
 
-**How to find:**
-1. Use the same `project.all` API call as above
-2. Find your project and environment
-3. Look for the application in the environment
-4. Copy the `applicationId` value
+## How It Works
 
-**Alternatively**, create a new application in Dokploy:
-1. Log into Dokploy
-2. Navigate to your "Sessions" project
-3. Select the appropriate environment
-4. Create a new application
-5. Configure it for your repository
-6. Copy the application ID
+The workflow automatically:
+
+1. **Generates a unique application name** based on: `{owner}-{repo}-{branch}-{short-sha}`
+2. **Checks if the application exists** in your Dokploy project
+3. **Creates the application** if it doesn't exist, with:
+   - GitHub repository integration
+   - Branch tracking
+   - Nixpacks build system
+   - Port 3000
+4. **Adds a domain** to the application: `https://{owner}-{repo}-{branch}-{short-sha}.etdofresh.com`
+5. **Deploys the application** to Dokploy
+
+Each branch and commit gets its own isolated deployment with a unique URL.
 
 ## Workflow Triggers
 
@@ -136,6 +137,22 @@ env:
   NODE_VERSION: '20'  # Change to your preferred version
 ```
 
+### Customize Domain
+
+To use a different domain suffix, edit the workflow file and modify the domain assignment:
+
+```yaml
+DOMAIN="${APP_NAME}.yourdomain.com"  # Change etdofresh.com to your domain
+```
+
+### Change Default Port
+
+To use a different port, update both the application creation and domain configuration:
+
+```yaml
+"port": 8080  # Change from 3000 to your desired port
+```
+
 ### Add Build Artifacts
 
 To upload build artifacts for debugging:
@@ -160,16 +177,25 @@ The workflow generates a unique application name for each deployment:
 | Branch | Git branch (lowercase, `/` replaced with `-`) | `main` or `feature-new-ui` |
 | Short SHA | First 7 characters of commit hash | `abc1234` |
 
-**Example:** `webedt-supreme-spoon-feature-new-ui-abc1234`
+**Example Application Name:** `webedt-supreme-spoon-feature-new-ui-abc1234`
+
+**Example Domain:** `https://webedt-supreme-spoon-feature-new-ui-abc1234.etdofresh.com`
 
 ## Deployment Process
 
 1. **Checkout**: Code is checked out from the repository
 2. **Setup**: Node.js and dependencies are installed
 3. **Build**: Project is built using `npm run build`
-4. **Metadata**: Deployment name is generated
-5. **Deploy**: Dokploy deployment is triggered via API
-6. **Summary**: Deployment results are displayed in GitHub Actions
+4. **Metadata**: Unique deployment name is generated
+5. **Application Discovery**: Checks if application already exists in Dokploy
+6. **Application Creation** (if needed): Creates new application with:
+   - GitHub repository integration
+   - Branch tracking
+   - Port 3000 configuration
+   - Nixpacks build system
+7. **Domain Configuration** (if new): Adds domain `https://{app-name}.etdofresh.com`
+8. **Deploy**: Triggers Dokploy deployment via API
+9. **Summary**: Displays deployment results with application URL
 
 ## Monitoring Deployments
 

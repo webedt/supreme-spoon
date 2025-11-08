@@ -65,13 +65,15 @@ This project is configured for automated deployment to Dokploy using GitHub Acti
 
 ### Automated Deployment
 
-The workflow automatically deploys to Dokploy when code is pushed to specific branches. Each deployment is named using the pattern:
+The workflow automatically deploys to Dokploy when code is pushed to any branch. Each deployment:
 
-```
-{owner}-{repo}-{branch}-{short-sha}
-```
+- Creates a unique application: `{owner}-{repo}-{branch}-{short-sha}`
+- Gets its own domain: `https://{owner}-{repo}-{branch}-{short-sha}.etdofresh.com`
+- Runs on port 3000
 
-**Example:** `webedt-supreme-spoon-main-abc1234`
+**Example:**
+- Application: `webedt-supreme-spoon-main-abc1234`
+- URL: `https://webedt-supreme-spoon-main-abc1234.etdofresh.com`
 
 ### Setup Deployment
 
@@ -90,7 +92,8 @@ The workflow automatically deploys to Dokploy when code is pushed to specific br
 
    **Secrets tab:**
    - `DOKPLOY_API_KEY` - Your Dokploy API key
-   - `DOKPLOY_APPLICATION_ID` - ID of the target application
+
+   **Note**: Applications are created automatically - no need to pre-create them!
 
 3. **Push to deploy:**
    ```bash

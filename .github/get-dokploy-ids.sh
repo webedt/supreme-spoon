@@ -118,16 +118,15 @@ if [ "$USE_JQ" = true ]; then
 
         echo ""
 
-        # Get applications in Sessions project (from all environments)
-        print_info "Applications in 'Sessions' project:\n"
+        # Show applications in Sessions project (for reference only)
+        print_info "Existing applications in 'Sessions' project (for reference):\n"
 
-        APPS=$(echo "$BODY" | jq -r '.[] | select(.name == "Sessions") | .environments[]? | .applications[]? | "  - \(.name) (Environment: \(.environmentName // "default"))\n    Application ID: \(.applicationId)\n    Type: \(.applicationType // "N/A")\n    Status: \(.applicationStatus // "N/A")\n"')
+        APPS=$(echo "$BODY" | jq -r '.[] | select(.name == "Sessions") | .environments[]? | .applications[]? | "  - \(.name)\n    Application ID: \(.applicationId)\n    Type: \(.applicationType // "N/A")\n    Status: \(.applicationStatus // "N/A")\n"')
 
         if [ -n "$APPS" ]; then
             echo "$APPS"
         else
-            print_warning "No applications found in 'Sessions' project"
-            print_info "You may need to create an application first"
+            print_info "No applications found yet - they will be created automatically on first deployment"
         fi
 
         # Also check for compose services, databases, etc.
@@ -184,8 +183,7 @@ if [ "$USE_JQ" = true ]; then
     echo "4. DOKPLOY_API_KEY"
     echo -e "   Value: ${GREEN}[Your API Key - keep this secret]${NC}"
     echo ""
-    echo "5. DOKPLOY_APPLICATION_ID"
-    echo -e "   Value: ${YELLOW}[Get this from the application list above]${NC}"
+    echo -e "${GREEN}✓${NC} Applications will be created automatically - no need to pre-create them!"
     echo ""
 
 else
@@ -199,7 +197,8 @@ echo "1. Copy the IDs from above"
 echo "2. Go to your GitHub repository"
 echo "3. Navigate to: Settings > Secrets and variables > Actions"
 echo "4. Add Variables (Variables tab): DOKPLOY_URL, DOKPLOY_PROJECT_ID, DOKPLOY_ENVIRONMENT_ID"
-echo "5. Add Secrets (Secrets tab): DOKPLOY_API_KEY, DOKPLOY_APPLICATION_ID"
+echo "5. Add Secret (Secrets tab): DOKPLOY_API_KEY"
 echo "6. Push code to trigger the deployment workflow"
+echo "7. Applications will be created automatically with unique domains!"
 echo ""
 print_info "For more information, see .github/DEPLOYMENT.md"
