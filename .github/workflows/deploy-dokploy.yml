@@ -70,6 +70,9 @@ jobs:
           GITHUB_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
           GITHUB_BRANCH: ${{ github.ref_name }}
         run: |
+          # Strip trailing slash from DOKPLOY_URL if present
+          DOKPLOY_URL="${DOKPLOY_URL%/}"
+
           echo "🔍 Checking if application '${APP_NAME}' exists..."
 
           # Get all projects to find if our application exists
@@ -170,6 +173,9 @@ jobs:
           APPLICATION_ID: ${{ steps.dokploy_app.outputs.application_id }}
           APP_NAME: ${{ steps.metadata.outputs.app_name }}
         run: |
+          # Strip trailing slash from DOKPLOY_URL if present
+          DOKPLOY_URL="${DOKPLOY_URL%/}"
+
           echo "Deploying ${APP_NAME} to Dokploy..."
 
           # Trigger deployment using tRPC endpoint (recommended for CI/CD)
