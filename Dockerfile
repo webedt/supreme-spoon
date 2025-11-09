@@ -1,6 +1,5 @@
 # Development server with HMR
-# Use ARM64 architecture to match Dokploy server and avoid QEMU emulation
-FROM --platform=linux/arm64 node:20
+FROM node:20
 
 WORKDIR /app
 
