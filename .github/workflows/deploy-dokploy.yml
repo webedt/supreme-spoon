@@ -47,8 +47,78 @@ jobs:
           # Get short SHA
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
 
-          # Generate application name (without SHA for stable domain)
+          # Application name in Dokploy: full descriptive name (no length limit)
           APP_NAME="${OWNER}-${REPO}-${BRANCH}"
+
+          # DNS subdomain limit is 63 characters
+          MAX_LENGTH=63
+
+          # Function to extract unique part of branch name
+          extract_branch_unique() {
+            local branch="$1"
+            # Try to extract meaningful parts: PR numbers, issue numbers, or last segment
+            if [[ "$branch" =~ ^.*-([0-9]+)$ ]]; then
+              # If branch ends with number (like pr-123, issue-456), extract it
+              echo "${BASH_REMATCH[1]}"
+            elif [[ "$branch" =~ /([^/]+)$ ]]; then
+              # If branch has slashes, get last segment
+              echo "${BASH_REMATCH[1]}"
+            else
+              # Otherwise, get last part after last dash
+              echo "${branch##*-}"
+            fi
+          }
+
+          # Progressive fallback strategy for DOMAIN name to fit within 63 character subdomain limit
+          # Strategy 1: owner-repo-branch (most specific)
+          CANDIDATE="${OWNER}-${REPO}-${BRANCH}"
+          if [ ${#CANDIDATE} -le $MAX_LENGTH ]; then
+            DOMAIN_NAME="$CANDIDATE"
+            echo "✅ Domain Strategy 1 (owner-repo-branch): ${DOMAIN_NAME} (${#DOMAIN_NAME} chars)"
+          else
+            # Strategy 2: repo-branch (drop owner)
+            CANDIDATE="${REPO}-${BRANCH}"
+            if [ ${#CANDIDATE} -le $MAX_LENGTH ]; then
+              DOMAIN_NAME="$CANDIDATE"
+              echo "✅ Domain Strategy 2 (repo-branch): ${DOMAIN_NAME} (${#DOMAIN_NAME} chars)"
+            else
+              # Extract unique part of branch for further compression
+              BRANCH_UNIQUE=$(extract_branch_unique "$BRANCH")
+
+              # Strategy 3: owner-repo-branchpart
+              CANDIDATE="${OWNER}-${REPO}-${BRANCH_UNIQUE}"
+              if [ ${#CANDIDATE} -le $MAX_LENGTH ]; then
+                DOMAIN_NAME="$CANDIDATE"
+                echo "✅ Domain Strategy 3 (owner-repo-branchpart): ${DOMAIN_NAME} (${#DOMAIN_NAME} chars)"
+              else
+                # Strategy 4: repo-branchpart
+                CANDIDATE="${REPO}-${BRANCH_UNIQUE}"
+                if [ ${#CANDIDATE} -le $MAX_LENGTH ]; then
+                  DOMAIN_NAME="$CANDIDATE"
+                  echo "✅ Domain Strategy 4 (repo-branchpart): ${DOMAIN_NAME} (${#DOMAIN_NAME} chars)"
+                else
+                  # Strategy 5: owner-repo (drop branch completely)
+                  CANDIDATE="${OWNER}-${REPO}"
+                  if [ ${#CANDIDATE} -le $MAX_LENGTH ]; then
+                    DOMAIN_NAME="$CANDIDATE"
+                    echo "⚠️  Domain Strategy 5 (owner-repo): ${DOMAIN_NAME} (${#DOMAIN_NAME} chars) - branch info lost"
+                  else
+                    # Strategy 6: repo only (minimal fallback)
+                    CANDIDATE="${REPO}"
+                    if [ ${#CANDIDATE} -le $MAX_LENGTH ]; then
+                      DOMAIN_NAME="$CANDIDATE"
+                      echo "⚠️  Domain Strategy 6 (repo only): ${DOMAIN_NAME} (${#DOMAIN_NAME} chars) - owner & branch info lost"
+                    else
+                      # Last resort: hash the full name to fit within limit
+                      HASH=$(echo "${OWNER}-${REPO}-${BRANCH}" | sha256sum | cut -c1-$MAX_LENGTH)
+                      DOMAIN_NAME="${HASH}"
+                      echo "⚠️  Domain Strategy 7 (hash): ${DOMAIN_NAME} (${#DOMAIN_NAME} chars) - using hash"
+                    fi
+                  fi
+                fi
+              fi
+            fi
+          fi
 
           # Output metadata
           echo "owner=${OWNER}" >> $GITHUB_OUTPUT
@@ -56,8 +126,16 @@ jobs:
           echo "branch=${BRANCH}" >> $GITHUB_OUTPUT
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "app_name=${APP_NAME}" >> $GITHUB_OUTPUT
+          echo "domain_name=${DOMAIN_NAME}" >> $GITHUB_OUTPUT
 
-          echo "Generated application name: ${APP_NAME}"
+          echo ""
+          echo "📊 Name Generation Details:"
+          echo "  - Owner: ${OWNER} (${#OWNER} chars)"
+          echo "  - Repo: ${REPO} (${#REPO} chars)"
+          echo "  - Branch: ${BRANCH} (${#BRANCH} chars)"
+          echo "  - Short SHA: ${SHORT_SHA} (${#SHORT_SHA} chars)"
+          echo "  - App Name (Dokploy): ${APP_NAME} (${#APP_NAME} chars)"
+          echo "  - Domain Name: ${DOMAIN_NAME} (${#DOMAIN_NAME} chars, max: ${MAX_LENGTH})"
 
       - name: Get or Create Dokploy Application
         id: dokploy_app
@@ -117,8 +195,9 @@ jobs:
               echo "Response: ${UPDATE_BODY}"
             fi
 
-            # Ensure domain is configured
-            DOMAIN="${APP_NAME}.etdofresh.com"
+            # Ensure domain is configured (use DOMAIN_NAME for DNS compliance)
+            DOMAIN_NAME="${{ steps.metadata.outputs.domain_name }}"
+            DOMAIN="${DOMAIN_NAME}.etdofresh.com"
             echo "🔍 Checking domain configuration..."
 
             # Try to add domain (it will fail if it already exists, which is fine)
@@ -242,8 +321,9 @@ jobs:
               exit 1
             fi
 
-            # Add domain to the application
-            DOMAIN="${APP_NAME}.etdofresh.com"
+            # Add domain to the application (use DOMAIN_NAME for DNS compliance)
+            DOMAIN_NAME="${{ steps.metadata.outputs.domain_name }}"
+            DOMAIN="${DOMAIN_NAME}.etdofresh.com"
             echo "🌐 Adding domain: https://${DOMAIN}"
 
             DOMAIN_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
@@ -275,13 +355,14 @@ jobs:
             fi
           fi
 
+          DOMAIN_NAME="${{ steps.metadata.outputs.domain_name }}"
           echo "application_id=${APP_ID}" >> $GITHUB_OUTPUT
-          echo "domain=${APP_NAME}.etdofresh.com" >> $GITHUB_OUTPUT
+          echo "domain=${DOMAIN_NAME}.etdofresh.com" >> $GITHUB_OUTPUT
           echo ""
           echo "📋 Application Details:"
           echo "  - ID: ${APP_ID}"
           echo "  - Name: ${APP_NAME}"
-          echo "  - Domain: https://${APP_NAME}.etdofresh.com"
+          echo "  - Domain: https://${DOMAIN_NAME}.etdofresh.com"
           echo "  - Port: 80"
           echo "  - Environment: ${DOKPLOY_ENVIRONMENT_ID}"
 
@@ -331,9 +412,10 @@ jobs:
         run: |
           echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Application Name**: ${{ steps.metadata.outputs.app_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Application Name** (Dokploy): ${{ steps.metadata.outputs.app_name }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Application ID**: ${{ steps.dokploy_app.outputs.application_id }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Domain**: https://${{ steps.dokploy_app.outputs.domain }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Domain Name**: ${{ steps.metadata.outputs.domain_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Domain URL**: https://${{ steps.dokploy_app.outputs.domain }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Owner**: ${{ steps.metadata.outputs.owner }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Repository**: ${{ steps.metadata.outputs.repo }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Branch**: ${{ steps.metadata.outputs.branch }}" >> $GITHUB_STEP_SUMMARY
