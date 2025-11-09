@@ -303,7 +303,6 @@ jobs:
               UPDATE_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
-                  \"buildType\": \"docker\",
                   \"dockerImage\": \"${IMAGE_TAG}\",
                   \"dockerRegistryId\": \"${DOCKER_REGISTRY_ID}\",
                   \"registryId\": \"${DOCKER_REGISTRY_ID}\",
@@ -313,7 +312,7 @@ jobs:
                   }
                 }
               }"
-              echo "  - Build Type: Pre-built Docker Image (ARM64)"
+              echo "  - Deployment: Pre-built Docker Image (ARM64)"
               echo "  - Image: ${IMAGE_TAG}"
               echo "  - Using Docker Registry: ${DOCKER_REGISTRY_ID}"
               echo "  - Cluster Settings: 1 replica on ARM64 workers"
@@ -321,7 +320,6 @@ jobs:
               UPDATE_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
-                  \"buildType\": \"docker\",
                   \"dockerImage\": \"${IMAGE_TAG}\",
                   \"replicas\": 1,
                   \"placementSwarm\": {
@@ -329,7 +327,7 @@ jobs:
                   }
                 }
               }"
-              echo "  - Build Type: Pre-built Docker Image (ARM64)"
+              echo "  - Deployment: Pre-built Docker Image (ARM64)"
               echo "  - Image: ${IMAGE_TAG}"
               echo "  - No Docker Registry configured"
               echo "  - Cluster Settings: 1 replica on ARM64 workers"
@@ -540,7 +538,6 @@ jobs:
               UPDATE_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
-                  \"buildType\": \"docker\",
                   \"dockerImage\": \"${IMAGE_TAG}\",
                   \"dockerRegistryId\": \"${DOCKER_REGISTRY_ID}\",
                   \"registryId\": \"${DOCKER_REGISTRY_ID}\",
@@ -550,7 +547,7 @@ jobs:
                   }
                 }
               }"
-              echo "  - Build Type: Pre-built Docker Image (ARM64)"
+              echo "  - Deployment: Pre-built Docker Image (ARM64)"
               echo "  - Image: ${IMAGE_TAG}"
               echo "  - Using Docker Registry: ${DOCKER_REGISTRY_ID}"
               echo "  - Cluster Settings: 1 replica on ARM64 workers"
@@ -558,7 +555,6 @@ jobs:
               UPDATE_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
-                  \"buildType\": \"docker\",
                   \"dockerImage\": \"${IMAGE_TAG}\",
                   \"replicas\": 1,
                   \"placementSwarm\": {
@@ -566,7 +562,7 @@ jobs:
                   }
                 }
               }"
-              echo "  - Build Type: Pre-built Docker Image (ARM64)"
+              echo "  - Deployment: Pre-built Docker Image (ARM64)"
               echo "  - Image: ${IMAGE_TAG}"
               echo "  - No Docker Registry configured"
               echo "  - Cluster Settings: 1 replica on ARM64 workers"
