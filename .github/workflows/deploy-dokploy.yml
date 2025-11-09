@@ -198,32 +198,54 @@ jobs:
             # Ensure domain is configured (use DOMAIN_NAME for DNS compliance)
             DOMAIN_NAME="${{ steps.metadata.outputs.domain_name }}"
             DOMAIN="${DOMAIN_NAME}.etdofresh.com"
-            echo "🔍 Checking domain configuration..."
+            echo "🔍 Checking if domain exists..."
 
-            # Try to add domain (it will fail if it already exists, which is fine)
-            DOMAIN_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
-              "${DOKPLOY_URL}/api/trpc/domain.create" \
+            # Get existing domains for this application
+            APP_DETAILS=$(curl -s -X 'POST' \
+              "${DOKPLOY_URL}/api/trpc/application.one" \
               -H 'accept: application/json' \
               -H 'Content-Type: application/json' \
               -H "x-api-key: ${DOKPLOY_API_KEY}" \
               -d "{
                 \"json\": {
-                  \"applicationId\": \"${APP_ID}\",
-                  \"host\": \"${DOMAIN}\",
-                  \"path\": \"/\",
-                  \"port\": 80,
-                  \"https\": true,
-                  \"certificateType\": \"letsencrypt\",
-                  \"domainType\": \"application\"
+                  \"applicationId\": \"${APP_ID}\"
                 }
               }")
 
-            DOMAIN_HTTP_CODE=$(echo "$DOMAIN_RESPONSE" | tail -n1)
+            # Check if domain already exists
+            DOMAIN_EXISTS=$(echo "$APP_DETAILS" | jq -r --arg domain "$DOMAIN" \
+              '.result.data.json.domains[]? | select(.host == $domain) | .host' | head -n1)
 
-            if [ "$DOMAIN_HTTP_CODE" -ge 200 ] && [ "$DOMAIN_HTTP_CODE" -lt 300 ]; then
-              echo "✅ Domain configured: https://${DOMAIN}"
+            if [ -n "$DOMAIN_EXISTS" ] && [ "$DOMAIN_EXISTS" != "null" ]; then
+              echo "ℹ️  Domain already exists: https://${DOMAIN}"
             else
-              echo "ℹ️  Domain already configured or skipped"
+              echo "📝 Creating domain: https://${DOMAIN}"
+              DOMAIN_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
+                "${DOKPLOY_URL}/api/trpc/domain.create" \
+                -H 'accept: application/json' \
+                -H 'Content-Type: application/json' \
+                -H "x-api-key: ${DOKPLOY_API_KEY}" \
+                -d "{
+                  \"json\": {
+                    \"applicationId\": \"${APP_ID}\",
+                    \"host\": \"${DOMAIN}\",
+                    \"path\": \"/\",
+                    \"port\": 80,
+                    \"https\": true,
+                    \"certificateType\": \"letsencrypt\",
+                    \"domainType\": \"application\"
+                  }
+                }")
+
+              DOMAIN_HTTP_CODE=$(echo "$DOMAIN_RESPONSE" | tail -n1)
+
+              if [ "$DOMAIN_HTTP_CODE" -ge 200 ] && [ "$DOMAIN_HTTP_CODE" -lt 300 ]; then
+                echo "✅ Domain created successfully: https://${DOMAIN}"
+              else
+                echo "⚠️  Warning: Failed to create domain (HTTP ${DOMAIN_HTTP_CODE})"
+                DOMAIN_BODY=$(echo "$DOMAIN_RESPONSE" | sed '$d')
+                echo "Response: ${DOMAIN_BODY}"
+              fi
             fi
           else
             echo "📦 Application not found. Creating new application..."
@@ -324,7 +346,7 @@ jobs:
             # Add domain to the application (use DOMAIN_NAME for DNS compliance)
             DOMAIN_NAME="${{ steps.metadata.outputs.domain_name }}"
             DOMAIN="${DOMAIN_NAME}.etdofresh.com"
-            echo "🌐 Adding domain: https://${DOMAIN}"
+            echo "🌐 Creating domain: https://${DOMAIN}"
 
             DOMAIN_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
               "${DOKPLOY_URL}/api/trpc/domain.create" \
@@ -347,9 +369,9 @@ jobs:
             DOMAIN_BODY=$(echo "$DOMAIN_RESPONSE" | sed '$d')
 
             if [ "$DOMAIN_HTTP_CODE" -ge 200 ] && [ "$DOMAIN_HTTP_CODE" -lt 300 ]; then
-              echo "✅ Domain added successfully: https://${DOMAIN}"
+              echo "✅ Domain created successfully: https://${DOMAIN}"
             else
-              echo "⚠️  Warning: Failed to add domain (HTTP ${DOMAIN_HTTP_CODE})"
+              echo "⚠️  Warning: Failed to create domain (HTTP ${DOMAIN_HTTP_CODE})"
               echo "Response: ${DOMAIN_BODY}"
               echo "You may need to add the domain manually"
             fi
@@ -377,7 +399,32 @@ jobs:
           # Strip trailing slash from DOKPLOY_URL if present
           DOKPLOY_URL="${DOKPLOY_URL%/}"
 
-          echo "Deploying ${APP_NAME} to Dokploy..."
+          echo "🛑 Stopping application ${APP_NAME} to ensure clean restart..."
+
+          # Stop the application first to ensure fresh deployment
+          STOP_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
+            "${DOKPLOY_URL}/api/trpc/application.stop" \
+            -H 'accept: application/json' \
+            -H 'Content-Type: application/json' \
+            -H "x-api-key: ${DOKPLOY_API_KEY}" \
+            -d "{
+              \"json\": {
+                \"applicationId\": \"${APPLICATION_ID}\"
+              }
+            }")
+
+          STOP_HTTP_CODE=$(echo "$STOP_RESPONSE" | tail -n1)
+
+          if [ "$STOP_HTTP_CODE" -ge 200 ] && [ "$STOP_HTTP_CODE" -lt 300 ]; then
+            echo "✅ Application stopped successfully"
+          else
+            echo "ℹ️  Application may not be running (HTTP ${STOP_HTTP_CODE}), proceeding with deployment"
+          fi
+
+          # Wait a moment for the stop to complete
+          sleep 2
+
+          echo "🚀 Deploying ${APP_NAME} to Dokploy..."
 
           # Trigger deployment using tRPC endpoint (recommended for CI/CD)
           RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
