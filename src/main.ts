@@ -67,7 +67,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         Welcome to your Vite + TypeScript project
       </p>
       <div class="card">
-        <button id="counter" type="button">Count is 100</button>
+        <button id="counter" type="button">Count is 200</button>
       </div>
     </div>
   </div>
@@ -81,7 +81,7 @@ const themeButton = document.querySelector<HTMLButtonElement>('#theme-toggle')!
 themeButton.addEventListener('click', toggleTheme)
 
 // Set up counter button
-let counter = 100
+let counter = 200
 const counterButton = document.querySelector<HTMLButtonElement>('#counter')!
 counterButton.addEventListener('click', () => {
   counter++
