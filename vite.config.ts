@@ -19,7 +19,7 @@ export default defineConfig({
     allowedHosts: ['.etdofresh.com'],
 
     // HMR configuration for reverse proxy
-    // Let Vite automatically detect from the request
+    // Don't set host - Vite will use the current page's hostname
     hmr: {
       protocol: 'wss',
       clientPort: 443,
