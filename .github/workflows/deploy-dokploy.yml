@@ -156,8 +156,12 @@ jobs:
             -H "x-api-key: ${DOKPLOY_API_KEY}" \
             -d '{"json":{}}')
 
-          # Try to find registry by URL
-          REGISTRY_ID=$(echo "$REGISTRIES" | jq -r '.result.data.json[]? | select(.registryUrl | contains("dockerregistry.etdofresh.com")) | .registryId' | head -n1)
+          # Debug: Show what registries exist
+          echo "📋 Available registries:"
+          echo "$REGISTRIES" | jq -r '.result.data.json[]? | "  - \(.registryName // "unnamed"): \(.registryUrl)"' || echo "  (none or error parsing)"
+
+          # Try to find registry by URL (case-insensitive search)
+          REGISTRY_ID=$(echo "$REGISTRIES" | jq -r '.result.data.json[]? | select(.registryUrl | ascii_downcase | contains("dockerregistry.etdofresh.com")) | .registryId' | head -n1)
 
           if [ -n "$REGISTRY_ID" ] && [ "$REGISTRY_ID" != "null" ]; then
             echo "✅ Found Docker registry: ${REGISTRY_ID}"
