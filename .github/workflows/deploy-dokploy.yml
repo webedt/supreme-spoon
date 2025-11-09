@@ -317,7 +317,7 @@ jobs:
             # Ensure domain is configured (use DOMAIN_NAME for DNS compliance)
             DOMAIN_NAME="${{ steps.metadata.outputs.domain_name }}"
             DOMAIN="${DOMAIN_NAME}.etdofresh.com"
-            echo "🔍 Checking if domain exists..."
+            echo "🔍 Checking for existing domains..."
 
             # Get existing domains for this application
             APP_DETAILS=$(curl -s -X 'POST' \
@@ -331,13 +331,68 @@ jobs:
                 }
               }")
 
-            # Check if domain already exists
-            DOMAIN_EXISTS=$(echo "$APP_DETAILS" | jq -r --arg domain "$DOMAIN" \
-              '.result.data.json.domains[]? | select(.host == $domain) | .host' | head -n1)
+            # Get all domains for this application and count duplicates
+            DOMAIN_IDS=$(echo "$APP_DETAILS" | jq -r --arg domain "$DOMAIN" \
+              '.result.data.json.domains[]? | select(.host == $domain) | .domainId')
 
-            if [ -n "$DOMAIN_EXISTS" ] && [ "$DOMAIN_EXISTS" != "null" ]; then
+            DOMAIN_COUNT=$(echo "$DOMAIN_IDS" | grep -c . 2>/dev/null || echo "0")
+
+            echo "Found $DOMAIN_COUNT existing domain(s) for ${DOMAIN}"
+
+            # If there are multiple domains with the same host, remove duplicates (keep the oldest one)
+            if [ "$DOMAIN_COUNT" -gt 1 ]; then
+              echo "⚠️  Found duplicate domains! Cleaning up..."
+
+              # Get all domain details sorted by creation date
+              SORTED_DOMAINS=$(echo "$APP_DETAILS" | jq -r --arg domain "$DOMAIN" \
+                '.result.data.json.domains[]? | select(.host == $domain) |
+                {domainId: .domainId, createdAt: .createdAt} |
+                @json' | sort -t'"' -k4)
+
+              # Keep track of first domain (oldest)
+              FIRST=true
+
+              # Remove duplicate domains (all except the first/oldest)
+              echo "$SORTED_DOMAINS" | while read -r domain_json; do
+                DUPLICATE_ID=$(echo "$domain_json" | jq -r '.domainId')
+                CREATED_AT=$(echo "$domain_json" | jq -r '.createdAt')
+
+                if [ "$FIRST" = true ]; then
+                  echo "  ✅ Keeping oldest domain: ${DUPLICATE_ID} (created ${CREATED_AT})"
+                  FIRST=false
+                else
+                  echo "  🗑️  Removing duplicate: ${DUPLICATE_ID} (created ${CREATED_AT})"
+                  DELETE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
+                    "${DOKPLOY_URL}/api/trpc/domain.delete" \
+                    -H 'accept: application/json' \
+                    -H 'Content-Type: application/json' \
+                    -H "x-api-key: ${DOKPLOY_API_KEY}" \
+                    -d "{
+                      \"json\": {
+                        \"domainId\": \"${DUPLICATE_ID}\"
+                      }
+                    }")
+
+                  DELETE_HTTP_CODE=$(echo "$DELETE_RESPONSE" | tail -n1)
+                  if [ "$DELETE_HTTP_CODE" -ge 200 ] && [ "$DELETE_HTTP_CODE" -lt 300 ]; then
+                    echo "    ✅ Deleted successfully"
+                  else
+                    echo "    ⚠️  Failed to delete (HTTP ${DELETE_HTTP_CODE})"
+                  fi
+                fi
+              done
+
+              echo "✅ Duplicate cleanup complete"
+              DOMAIN_EXISTS="true"
+            elif [ "$DOMAIN_COUNT" -eq 1 ]; then
               echo "ℹ️  Domain already exists: https://${DOMAIN}"
+              DOMAIN_EXISTS="true"
             else
+              DOMAIN_EXISTS="false"
+            fi
+
+            # Only create domain if it doesn't exist
+            if [ "$DOMAIN_EXISTS" = "false" ]; then
               echo "📝 Creating domain: https://${DOMAIN}"
               DOMAIN_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
                 "${DOKPLOY_URL}/api/trpc/domain.create" \
@@ -495,7 +550,7 @@ jobs:
             DOMAIN="${DOMAIN_NAME}.etdofresh.com"
 
             # Check if domain already exists to avoid duplicates
-            echo "🔍 Checking if domain already exists..."
+            echo "🔍 Checking for existing domains..."
             APP_DETAILS=$(curl -s -X 'POST' \
               "${DOKPLOY_URL}/api/trpc/application.one" \
               -H 'accept: application/json' \
@@ -507,12 +562,68 @@ jobs:
                 }
               }")
 
-            DOMAIN_EXISTS=$(echo "$APP_DETAILS" | jq -r --arg domain "$DOMAIN" \
-              '.result.data.json.domains[]? | select(.host == $domain) | .host' | head -n1)
+            # Get all domains for this application and count duplicates
+            DOMAIN_IDS=$(echo "$APP_DETAILS" | jq -r --arg domain "$DOMAIN" \
+              '.result.data.json.domains[]? | select(.host == $domain) | .domainId')
 
-            if [ -n "$DOMAIN_EXISTS" ] && [ "$DOMAIN_EXISTS" != "null" ]; then
+            DOMAIN_COUNT=$(echo "$DOMAIN_IDS" | grep -c . 2>/dev/null || echo "0")
+
+            echo "Found $DOMAIN_COUNT existing domain(s) for ${DOMAIN}"
+
+            # If there are multiple domains with the same host, remove duplicates (keep the oldest one)
+            if [ "$DOMAIN_COUNT" -gt 1 ]; then
+              echo "⚠️  Found duplicate domains! Cleaning up..."
+
+              # Get all domain details sorted by creation date
+              SORTED_DOMAINS=$(echo "$APP_DETAILS" | jq -r --arg domain "$DOMAIN" \
+                '.result.data.json.domains[]? | select(.host == $domain) |
+                {domainId: .domainId, createdAt: .createdAt} |
+                @json' | sort -t'"' -k4)
+
+              # Keep track of first domain (oldest)
+              FIRST=true
+
+              # Remove duplicate domains (all except the first/oldest)
+              echo "$SORTED_DOMAINS" | while read -r domain_json; do
+                DUPLICATE_ID=$(echo "$domain_json" | jq -r '.domainId')
+                CREATED_AT=$(echo "$domain_json" | jq -r '.createdAt')
+
+                if [ "$FIRST" = true ]; then
+                  echo "  ✅ Keeping oldest domain: ${DUPLICATE_ID} (created ${CREATED_AT})"
+                  FIRST=false
+                else
+                  echo "  🗑️  Removing duplicate: ${DUPLICATE_ID} (created ${CREATED_AT})"
+                  DELETE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
+                    "${DOKPLOY_URL}/api/trpc/domain.delete" \
+                    -H 'accept: application/json' \
+                    -H 'Content-Type: application/json' \
+                    -H "x-api-key: ${DOKPLOY_API_KEY}" \
+                    -d "{
+                      \"json\": {
+                        \"domainId\": \"${DUPLICATE_ID}\"
+                      }
+                    }")
+
+                  DELETE_HTTP_CODE=$(echo "$DELETE_RESPONSE" | tail -n1)
+                  if [ "$DELETE_HTTP_CODE" -ge 200 ] && [ "$DELETE_HTTP_CODE" -lt 300 ]; then
+                    echo "    ✅ Deleted successfully"
+                  else
+                    echo "    ⚠️  Failed to delete (HTTP ${DELETE_HTTP_CODE})"
+                  fi
+                fi
+              done
+
+              echo "✅ Duplicate cleanup complete"
+              DOMAIN_EXISTS="true"
+            elif [ "$DOMAIN_COUNT" -eq 1 ]; then
               echo "ℹ️  Domain already exists: https://${DOMAIN}"
+              DOMAIN_EXISTS="true"
             else
+              DOMAIN_EXISTS="false"
+            fi
+
+            # Only create domain if it doesn't exist
+            if [ "$DOMAIN_EXISTS" = "false" ]; then
               echo "🌐 Creating domain: https://${DOMAIN}"
               DOMAIN_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
                 "${DOKPLOY_URL}/api/trpc/domain.create" \
