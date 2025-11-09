@@ -20,9 +20,11 @@ export default defineConfig({
 
     // HMR configuration
     hmr: {
-      // Use the host for HMR websocket connection
-      // This is important when running in Docker or behind a proxy
-      clientPort: 5173,
+      // For proxied environments, use the browser's current host
+      // This allows HMR websocket to connect through the proxy
+      host: true,
+      protocol: 'wss',
+      port: 443,
     },
 
     // Watch configuration for file changes
