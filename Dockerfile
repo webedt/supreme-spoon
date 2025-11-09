@@ -1,5 +1,4 @@
 # Development server with HMR
-# Using node:20 (Debian bookworm) for better compatibility
 FROM node:20
 
 WORKDIR /app
@@ -12,6 +11,9 @@ RUN npm ci
 
 # Copy source code
 COPY . .
+
+# Disable V8 JIT compilation to avoid QEMU memory permission issues
+ENV NODE_OPTIONS="--jitless"
 
 # Expose Vite dev server port
 EXPOSE 5173
