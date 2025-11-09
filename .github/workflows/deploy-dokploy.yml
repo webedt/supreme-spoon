@@ -91,6 +91,31 @@ jobs:
 
           if [ -n "$APP_ID" ] && [ "$APP_ID" != "null" ]; then
             echo "✅ Found existing application: ${APP_ID}"
+
+            # Update existing application to use Dockerfile
+            echo "🐳 Ensuring Docker build configuration..."
+            UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
+              "${DOKPLOY_URL}/api/trpc/application.update" \
+              -H 'accept: application/json' \
+              -H 'Content-Type: application/json' \
+              -H "x-api-key: ${DOKPLOY_API_KEY}" \
+              -d "{
+                \"json\": {
+                  \"applicationId\": \"${APP_ID}\",
+                  \"buildType\": \"dockerfile\",
+                  \"dockerfile\": \"Dockerfile\"
+                }
+              }")
+
+            UPDATE_HTTP_CODE=$(echo "$UPDATE_RESPONSE" | tail -n1)
+            UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
+
+            if [ "$UPDATE_HTTP_CODE" -ge 200 ] && [ "$UPDATE_HTTP_CODE" -lt 300 ]; then
+              echo "✅ Docker build configuration updated"
+            else
+              echo "⚠️  Warning: Failed to update build configuration (HTTP ${UPDATE_HTTP_CODE})"
+              echo "Response: ${UPDATE_BODY}"
+            fi
           else
             echo "📦 Application not found. Creating new application..."
 
@@ -158,6 +183,32 @@ jobs:
             else
               echo "❌ Failed to configure GitHub provider (HTTP ${GITHUB_HTTP_CODE})"
               echo "Response: ${GITHUB_BODY}"
+              exit 1
+            fi
+
+            # Configure application to use Dockerfile
+            echo "🐳 Configuring Docker build settings..."
+            UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
+              "${DOKPLOY_URL}/api/trpc/application.update" \
+              -H 'accept: application/json' \
+              -H 'Content-Type: application/json' \
+              -H "x-api-key: ${DOKPLOY_API_KEY}" \
+              -d "{
+                \"json\": {
+                  \"applicationId\": \"${APP_ID}\",
+                  \"buildType\": \"dockerfile\",
+                  \"dockerfile\": \"Dockerfile\"
+                }
+              }")
+
+            UPDATE_HTTP_CODE=$(echo "$UPDATE_RESPONSE" | tail -n1)
+            UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
+
+            if [ "$UPDATE_HTTP_CODE" -ge 200 ] && [ "$UPDATE_HTTP_CODE" -lt 300 ]; then
+              echo "✅ Docker build configuration updated successfully"
+            else
+              echo "❌ Failed to update build configuration (HTTP ${UPDATE_HTTP_CODE})"
+              echo "Response: ${UPDATE_BODY}"
               exit 1
             fi
 
