@@ -1,5 +1,6 @@
 # Development server with HMR
-FROM node:20-alpine
+# Using standard node image instead of alpine to avoid QEMU architecture issues
+FROM --platform=linux/amd64 node:20-slim
 
 WORKDIR /app
 
