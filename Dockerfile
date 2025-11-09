@@ -1,5 +1,6 @@
 # Development server with HMR
-FROM node:20
+# Build for ARM64 to run natively on ARM64 servers (cross-compiled on x86_64 build machine)
+FROM --platform=linux/arm64 node:20
 
 WORKDIR /app
 
