@@ -137,6 +137,36 @@ jobs:
           echo "  - App Name (Dokploy): ${APP_NAME} (${#APP_NAME} chars)"
           echo "  - Domain Name: ${DOMAIN_NAME} (${#DOMAIN_NAME} chars, max: ${MAX_LENGTH})"
 
+      - name: Get Docker Registry ID
+        id: registry
+        env:
+          DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+        run: |
+          # Strip trailing slash from DOKPLOY_URL if present
+          DOKPLOY_URL="${DOKPLOY_URL%/}"
+
+          echo "🔍 Looking for Docker registry 'dockerregistry.etdofresh.com'..."
+
+          # Get all registries
+          REGISTRIES=$(curl -s -X 'POST' \
+            "${DOKPLOY_URL}/api/trpc/registry.all" \
+            -H 'accept: application/json' \
+            -H 'Content-Type: application/json' \
+            -H "x-api-key: ${DOKPLOY_API_KEY}" \
+            -d '{"json":{}}')
+
+          # Try to find registry by URL
+          REGISTRY_ID=$(echo "$REGISTRIES" | jq -r '.result.data.json[]? | select(.registryUrl | contains("dockerregistry.etdofresh.com")) | .registryId' | head -n1)
+
+          if [ -n "$REGISTRY_ID" ] && [ "$REGISTRY_ID" != "null" ]; then
+            echo "✅ Found Docker registry: ${REGISTRY_ID}"
+            echo "registry_id=${REGISTRY_ID}" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️  Docker registry 'dockerregistry.etdofresh.com' not found"
+            echo "registry_id=" >> $GITHUB_OUTPUT
+          fi
+
       - name: Get or Create Dokploy Application
         id: dokploy_app
         env:
@@ -145,6 +175,7 @@ jobs:
           DOKPLOY_PROJECT_ID: ${{ vars.DOKPLOY_PROJECT_ID }}
           DOKPLOY_ENVIRONMENT_ID: ${{ vars.DOKPLOY_ENVIRONMENT_ID }}
           DOKPLOY_GITHUB_ID: ${{ vars.DOKPLOY_GITHUB_ID }}
+          DOCKER_REGISTRY_ID: ${{ steps.registry.outputs.registry_id }}
           APP_NAME: ${{ steps.metadata.outputs.app_name }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_BRANCH: ${{ github.ref_name }}
@@ -172,12 +203,23 @@ jobs:
 
             # Update existing application to use Dockerfile with worker node constraint
             echo "🐳 Ensuring Docker build configuration and placement constraints..."
-            UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
-              "${DOKPLOY_URL}/api/trpc/application.update" \
-              -H 'accept: application/json' \
-              -H 'Content-Type: application/json' \
-              -H "x-api-key: ${DOKPLOY_API_KEY}" \
-              -d "{
+
+            # Build JSON payload with optional dockerRegistryId
+            if [ -n "${DOCKER_REGISTRY_ID}" ]; then
+              UPDATE_JSON="{
+                \"json\": {
+                  \"applicationId\": \"${APP_ID}\",
+                  \"buildType\": \"dockerfile\",
+                  \"dockerfile\": \"Dockerfile\",
+                  \"dockerRegistryId\": \"${DOCKER_REGISTRY_ID}\",
+                  \"placementSwarm\": {
+                    \"Constraints\": [\"node.role==worker\"]
+                  }
+                }
+              }"
+              echo "  - Using Docker Registry: ${DOCKER_REGISTRY_ID}"
+            else
+              UPDATE_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
                   \"buildType\": \"dockerfile\",
@@ -186,7 +228,16 @@ jobs:
                     \"Constraints\": [\"node.role==worker\"]
                   }
                 }
-              }")
+              }"
+              echo "  - No Docker Registry configured"
+            fi
+
+            UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
+              "${DOKPLOY_URL}/api/trpc/application.update" \
+              -H 'accept: application/json' \
+              -H 'Content-Type: application/json' \
+              -H "x-api-key: ${DOKPLOY_API_KEY}" \
+              -d "${UPDATE_JSON}")
 
             UPDATE_HTTP_CODE=$(echo "$UPDATE_RESPONSE" | tail -n1)
             UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
@@ -322,12 +373,23 @@ jobs:
 
             # Configure application to use Dockerfile with worker node constraint
             echo "🐳 Configuring Docker build settings and placement constraints..."
-            UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
-              "${DOKPLOY_URL}/api/trpc/application.update" \
-              -H 'accept: application/json' \
-              -H 'Content-Type: application/json' \
-              -H "x-api-key: ${DOKPLOY_API_KEY}" \
-              -d "{
+
+            # Build JSON payload with optional dockerRegistryId
+            if [ -n "${DOCKER_REGISTRY_ID}" ]; then
+              UPDATE_JSON="{
+                \"json\": {
+                  \"applicationId\": \"${APP_ID}\",
+                  \"buildType\": \"dockerfile\",
+                  \"dockerfile\": \"Dockerfile\",
+                  \"dockerRegistryId\": \"${DOCKER_REGISTRY_ID}\",
+                  \"placementSwarm\": {
+                    \"Constraints\": [\"node.role==worker\"]
+                  }
+                }
+              }"
+              echo "  - Using Docker Registry: ${DOCKER_REGISTRY_ID}"
+            else
+              UPDATE_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
                   \"buildType\": \"dockerfile\",
@@ -336,7 +398,16 @@ jobs:
                     \"Constraints\": [\"node.role==worker\"]
                   }
                 }
-              }")
+              }"
+              echo "  - No Docker Registry configured"
+            fi
+
+            UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
+              "${DOKPLOY_URL}/api/trpc/application.update" \
+              -H 'accept: application/json' \
+              -H 'Content-Type: application/json' \
+              -H "x-api-key: ${DOKPLOY_API_KEY}" \
+              -d "${UPDATE_JSON}")
 
             UPDATE_HTTP_CODE=$(echo "$UPDATE_RESPONSE" | tail -n1)
             UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
