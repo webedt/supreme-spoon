@@ -137,6 +137,96 @@ jobs:
           echo "  - App Name (Dokploy): ${APP_NAME} (${#APP_NAME} chars)"
           echo "  - Domain Name: ${DOMAIN_NAME} (${#DOMAIN_NAME} chars, max: ${MAX_LENGTH})"
 
+      - name: Get Docker Registry ID
+        id: registry
+        env:
+          DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+        run: |
+          # Strip trailing slash from DOKPLOY_URL if present
+          DOKPLOY_URL="${DOKPLOY_URL%/}"
+
+          echo "🔍 Looking for Docker registry 'dockerregistry.etdofresh.com'..."
+
+          # Get all registries
+          REGISTRIES=$(curl -s -X 'GET' \
+            "${DOKPLOY_URL}/api/trpc/registry.all" \
+            -H 'accept: application/json' \
+            -H "x-api-key: ${DOKPLOY_API_KEY}")
+
+          # Debug: Show raw response and parsed registries
+          echo "📋 Registry API Response:"
+          echo "$REGISTRIES" | jq '.' || echo "  (invalid JSON)"
+          echo ""
+          echo "📋 Available registries:"
+          echo "$REGISTRIES" | jq -r '.result.data.json[]? | "  - \(.registryName // "unnamed"): \(.registryUrl)"' || echo "  (none or error parsing)"
+
+          # Try to find registry by URL (case-insensitive search)
+          REGISTRY_DATA=$(echo "$REGISTRIES" | jq -r '.result.data.json[]? | select(.registryUrl | ascii_downcase | contains("dockerregistry.etdofresh.com"))')
+          REGISTRY_ID=$(echo "$REGISTRY_DATA" | jq -r '.registryId')
+          REGISTRY_URL=$(echo "$REGISTRY_DATA" | jq -r '.registryUrl')
+
+          if [ -n "$REGISTRY_ID" ] && [ "$REGISTRY_ID" != "null" ]; then
+            echo "✅ Found Docker registry: ${REGISTRY_ID}"
+            echo "  Current URL: ${REGISTRY_URL}"
+
+            # Check if the URL contains https:// or http:// protocol
+            if echo "$REGISTRY_URL" | grep -qE '^https?://'; then
+              echo "⚠️  Registry URL contains protocol prefix (https:// or http://)"
+              echo "   This will cause Docker image reference errors."
+              echo "   Docker registries should be configured with hostname only."
+              echo ""
+              echo "🔧 Fixing registry URL by removing protocol..."
+
+              # Remove protocol from URL
+              FIXED_URL=$(echo "$REGISTRY_URL" | sed -E 's|^https?://||')
+              echo "  Old URL: ${REGISTRY_URL}"
+              echo "  New URL: ${FIXED_URL}"
+
+              # Get all registry fields for update
+              REGISTRY_NAME=$(echo "$REGISTRY_DATA" | jq -r '.registryName')
+              REGISTRY_USERNAME=$(echo "$REGISTRY_DATA" | jq -r '.username')
+              SELF_HOSTED=$(echo "$REGISTRY_DATA" | jq -r '.selfHosted')
+              IMAGE_PREFIX=$(echo "$REGISTRY_DATA" | jq -r '.imagePrefix')
+
+              # Update the registry with corrected URL
+              UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
+                "${DOKPLOY_URL}/api/trpc/registry.update" \
+                -H 'accept: application/json' \
+                -H 'Content-Type: application/json' \
+                -H "x-api-key: ${DOKPLOY_API_KEY}" \
+                -d "{
+                  \"json\": {
+                    \"registryId\": \"${REGISTRY_ID}\",
+                    \"registryUrl\": \"${FIXED_URL}\",
+                    \"registryName\": \"${REGISTRY_NAME}\",
+                    \"username\": \"${REGISTRY_USERNAME}\",
+                    \"selfHosted\": ${SELF_HOSTED},
+                    \"imagePrefix\": \"${IMAGE_PREFIX}\"
+                  }
+                }")
+
+              UPDATE_HTTP_CODE=$(echo "$UPDATE_RESPONSE" | tail -n1)
+              UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
+
+              if [ "$UPDATE_HTTP_CODE" -ge 200 ] && [ "$UPDATE_HTTP_CODE" -lt 300 ]; then
+                echo "✅ Registry URL updated successfully!"
+                echo "  Response Code: ${UPDATE_HTTP_CODE}"
+              else
+                echo "❌ Failed to update registry URL (HTTP ${UPDATE_HTTP_CODE})"
+                echo "Response: ${UPDATE_BODY}"
+                echo "⚠️  Continuing with original registry configuration..."
+              fi
+            else
+              echo "✅ Registry URL format is correct (no protocol prefix)"
+            fi
+
+            echo "registry_id=${REGISTRY_ID}" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️  Docker registry 'dockerregistry.etdofresh.com' not found"
+            echo "registry_id=" >> $GITHUB_OUTPUT
+          fi
+
       - name: Get or Create Dokploy Application
         id: dokploy_app
         env:
@@ -145,6 +235,7 @@ jobs:
           DOKPLOY_PROJECT_ID: ${{ vars.DOKPLOY_PROJECT_ID }}
           DOKPLOY_ENVIRONMENT_ID: ${{ vars.DOKPLOY_ENVIRONMENT_ID }}
           DOKPLOY_GITHUB_ID: ${{ vars.DOKPLOY_GITHUB_ID }}
+          DOCKER_REGISTRY_ID: ${{ steps.registry.outputs.registry_id }}
           APP_NAME: ${{ steps.metadata.outputs.app_name }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_BRANCH: ${{ github.ref_name }}
@@ -172,21 +263,46 @@ jobs:
 
             # Update existing application to use Dockerfile with worker node constraint
             echo "🐳 Ensuring Docker build configuration and placement constraints..."
+
+            # Build JSON payload with optional dockerRegistryId and cluster settings
+            if [ -n "${DOCKER_REGISTRY_ID}" ]; then
+              UPDATE_JSON="{
+                \"json\": {
+                  \"applicationId\": \"${APP_ID}\",
+                  \"buildType\": \"dockerfile\",
+                  \"dockerfile\": \"Dockerfile\",
+                  \"dockerRegistryId\": \"${DOCKER_REGISTRY_ID}\",
+                  \"registryId\": \"${DOCKER_REGISTRY_ID}\",
+                  \"replicas\": 1,
+                  \"placementSwarm\": {
+                    \"Constraints\": [\"node.role==worker\"]
+                  }
+                }
+              }"
+              echo "  - Using Docker Registry: ${DOCKER_REGISTRY_ID}"
+              echo "  - Cluster Settings: 1 replica on worker nodes"
+            else
+              UPDATE_JSON="{
+                \"json\": {
+                  \"applicationId\": \"${APP_ID}\",
+                  \"buildType\": \"dockerfile\",
+                  \"dockerfile\": \"Dockerfile\",
+                  \"replicas\": 1,
+                  \"placementSwarm\": {
+                    \"Constraints\": [\"node.role==worker\"]
+                  }
+                }
+              }"
+              echo "  - No Docker Registry configured"
+              echo "  - Cluster Settings: 1 replica on worker nodes"
+            fi
+
             UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
               "${DOKPLOY_URL}/api/trpc/application.update" \
               -H 'accept: application/json' \
               -H 'Content-Type: application/json' \
               -H "x-api-key: ${DOKPLOY_API_KEY}" \
-              -d "{
-                \"json\": {
-                  \"applicationId\": \"${APP_ID}\",
-                  \"buildType\": \"dockerfile\",
-                  \"dockerfile\": \"Dockerfile\",
-                  \"placementSwarm\": {
-                    \"Constraints\": [\"node.role == worker\"]
-                  }
-                }
-              }")
+              -d "${UPDATE_JSON}")
 
             UPDATE_HTTP_CODE=$(echo "$UPDATE_RESPONSE" | tail -n1)
             UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
@@ -322,21 +438,46 @@ jobs:
 
             # Configure application to use Dockerfile with worker node constraint
             echo "🐳 Configuring Docker build settings and placement constraints..."
+
+            # Build JSON payload with optional dockerRegistryId and cluster settings
+            if [ -n "${DOCKER_REGISTRY_ID}" ]; then
+              UPDATE_JSON="{
+                \"json\": {
+                  \"applicationId\": \"${APP_ID}\",
+                  \"buildType\": \"dockerfile\",
+                  \"dockerfile\": \"Dockerfile\",
+                  \"dockerRegistryId\": \"${DOCKER_REGISTRY_ID}\",
+                  \"registryId\": \"${DOCKER_REGISTRY_ID}\",
+                  \"replicas\": 1,
+                  \"placementSwarm\": {
+                    \"Constraints\": [\"node.role==worker\"]
+                  }
+                }
+              }"
+              echo "  - Using Docker Registry: ${DOCKER_REGISTRY_ID}"
+              echo "  - Cluster Settings: 1 replica on worker nodes"
+            else
+              UPDATE_JSON="{
+                \"json\": {
+                  \"applicationId\": \"${APP_ID}\",
+                  \"buildType\": \"dockerfile\",
+                  \"dockerfile\": \"Dockerfile\",
+                  \"replicas\": 1,
+                  \"placementSwarm\": {
+                    \"Constraints\": [\"node.role==worker\"]
+                  }
+                }
+              }"
+              echo "  - No Docker Registry configured"
+              echo "  - Cluster Settings: 1 replica on worker nodes"
+            fi
+
             UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
               "${DOKPLOY_URL}/api/trpc/application.update" \
               -H 'accept: application/json' \
               -H 'Content-Type: application/json' \
               -H "x-api-key: ${DOKPLOY_API_KEY}" \
-              -d "{
-                \"json\": {
-                  \"applicationId\": \"${APP_ID}\",
-                  \"buildType\": \"dockerfile\",
-                  \"dockerfile\": \"Dockerfile\",
-                  \"placementSwarm\": {
-                    \"Constraints\": [\"node.role == worker\"]
-                  }
-                }
-              }")
+              -d "${UPDATE_JSON}")
 
             UPDATE_HTTP_CODE=$(echo "$UPDATE_RESPONSE" | tail -n1)
             UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
@@ -352,34 +493,54 @@ jobs:
             # Add domain to the application (use DOMAIN_NAME for DNS compliance)
             DOMAIN_NAME="${{ steps.metadata.outputs.domain_name }}"
             DOMAIN="${DOMAIN_NAME}.etdofresh.com"
-            echo "🌐 Creating domain: https://${DOMAIN}"
 
-            DOMAIN_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
-              "${DOKPLOY_URL}/api/trpc/domain.create" \
+            # Check if domain already exists to avoid duplicates
+            echo "🔍 Checking if domain already exists..."
+            APP_DETAILS=$(curl -s -X 'POST' \
+              "${DOKPLOY_URL}/api/trpc/application.one" \
               -H 'accept: application/json' \
               -H 'Content-Type: application/json' \
               -H "x-api-key: ${DOKPLOY_API_KEY}" \
               -d "{
                 \"json\": {
-                  \"applicationId\": \"${APP_ID}\",
-                  \"host\": \"${DOMAIN}\",
-                  \"path\": \"/\",
-                  \"port\": 80,
-                  \"https\": true,
-                  \"certificateType\": \"letsencrypt\",
-                  \"domainType\": \"application\"
+                  \"applicationId\": \"${APP_ID}\"
                 }
               }")
 
-            DOMAIN_HTTP_CODE=$(echo "$DOMAIN_RESPONSE" | tail -n1)
-            DOMAIN_BODY=$(echo "$DOMAIN_RESPONSE" | sed '$d')
+            DOMAIN_EXISTS=$(echo "$APP_DETAILS" | jq -r --arg domain "$DOMAIN" \
+              '.result.data.json.domains[]? | select(.host == $domain) | .host' | head -n1)
 
-            if [ "$DOMAIN_HTTP_CODE" -ge 200 ] && [ "$DOMAIN_HTTP_CODE" -lt 300 ]; then
-              echo "✅ Domain created successfully: https://${DOMAIN}"
+            if [ -n "$DOMAIN_EXISTS" ] && [ "$DOMAIN_EXISTS" != "null" ]; then
+              echo "ℹ️  Domain already exists: https://${DOMAIN}"
             else
-              echo "⚠️  Warning: Failed to create domain (HTTP ${DOMAIN_HTTP_CODE})"
-              echo "Response: ${DOMAIN_BODY}"
-              echo "You may need to add the domain manually"
+              echo "🌐 Creating domain: https://${DOMAIN}"
+              DOMAIN_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
+                "${DOKPLOY_URL}/api/trpc/domain.create" \
+                -H 'accept: application/json' \
+                -H 'Content-Type: application/json' \
+                -H "x-api-key: ${DOKPLOY_API_KEY}" \
+                -d "{
+                  \"json\": {
+                    \"applicationId\": \"${APP_ID}\",
+                    \"host\": \"${DOMAIN}\",
+                    \"path\": \"/\",
+                    \"port\": 80,
+                    \"https\": true,
+                    \"certificateType\": \"letsencrypt\",
+                    \"domainType\": \"application\"
+                  }
+                }")
+
+              DOMAIN_HTTP_CODE=$(echo "$DOMAIN_RESPONSE" | tail -n1)
+              DOMAIN_BODY=$(echo "$DOMAIN_RESPONSE" | sed '$d')
+
+              if [ "$DOMAIN_HTTP_CODE" -ge 200 ] && [ "$DOMAIN_HTTP_CODE" -lt 300 ]; then
+                echo "✅ Domain created successfully: https://${DOMAIN}"
+              else
+                echo "⚠️  Warning: Failed to create domain (HTTP ${DOMAIN_HTTP_CODE})"
+                echo "Response: ${DOMAIN_BODY}"
+                echo "You may need to add the domain manually"
+              fi
             fi
           fi
 
