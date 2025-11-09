@@ -227,6 +227,37 @@ jobs:
             echo "registry_id=" >> $GITHUB_OUTPUT
           fi
 
+      - name: Login to Docker Registry
+        run: |
+          echo "${{ secrets.DOCKER_REGISTRY_PASSWORD }}" | docker login dockerregistry.etdofresh.com -u "${{ secrets.DOCKER_REGISTRY_USERNAME }}" --password-stdin
+
+      - name: Build and Push Docker Image
+        id: build
+        env:
+          APP_NAME: ${{ steps.metadata.outputs.app_name }}
+          SHORT_SHA: ${{ steps.metadata.outputs.short_sha }}
+        run: |
+          # Build image tag
+          IMAGE_TAG="dockerregistry.etdofresh.com/${APP_NAME}:${SHORT_SHA}"
+          IMAGE_TAG_LATEST="dockerregistry.etdofresh.com/${APP_NAME}:latest"
+
+          echo "🐳 Building Docker image for ARM64 (native build)..."
+          echo "  Image: ${IMAGE_TAG}"
+
+          # Build for ARM64 natively (runner is ARM64)
+          docker buildx build \
+            --tag "${IMAGE_TAG}" \
+            --tag "${IMAGE_TAG_LATEST}" \
+            --push \
+            .
+
+          echo "✅ Image built and pushed successfully"
+          echo "  Tags:"
+          echo "    - ${IMAGE_TAG}"
+          echo "    - ${IMAGE_TAG_LATEST}"
+
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
       - name: Get or Create Dokploy Application
         id: dokploy_app
         env:
@@ -261,42 +292,47 @@ jobs:
           if [ -n "$APP_ID" ] && [ "$APP_ID" != "null" ]; then
             echo "✅ Found existing application: ${APP_ID}"
 
-            # Update existing application to use Dockerfile (Dokploy builds natively)
-            echo "🐳 Configuring Dockerfile build on Dokploy server..."
+            # Update existing application to use pre-built Docker image
+            echo "🐳 Configuring pre-built Docker image deployment..."
 
-            # Build JSON payload for native Dockerfile build
+            # Use pre-built Docker image from registry
+            IMAGE_TAG="${{ steps.build.outputs.image_tag }}"
+
+            # Build JSON payload for pre-built Docker image deployment
             if [ -n "${DOCKER_REGISTRY_ID}" ]; then
               UPDATE_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
-                  \"buildType\": \"dockerfile\",
-                  \"dockerfile\": \"Dockerfile\",
+                  \"buildType\": \"docker\",
+                  \"dockerImage\": \"${IMAGE_TAG}\",
                   \"dockerRegistryId\": \"${DOCKER_REGISTRY_ID}\",
                   \"registryId\": \"${DOCKER_REGISTRY_ID}\",
                   \"replicas\": 1,
                   \"placementSwarm\": {
-                    \"Constraints\": [\"node.platform.arch==x86_64\"]
+                    \"Constraints\": [\"node.role==worker\"]
                   }
                 }
               }"
-              echo "  - Build Type: Dockerfile (native build on Dokploy)"
+              echo "  - Build Type: Pre-built Docker Image (ARM64)"
+              echo "  - Image: ${IMAGE_TAG}"
               echo "  - Using Docker Registry: ${DOCKER_REGISTRY_ID}"
-              echo "  - Cluster Settings: 1 replica on worker nodes"
+              echo "  - Cluster Settings: 1 replica on ARM64 workers"
             else
               UPDATE_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
-                  \"buildType\": \"dockerfile\",
-                  \"dockerfile\": \"Dockerfile\",
+                  \"buildType\": \"docker\",
+                  \"dockerImage\": \"${IMAGE_TAG}\",
                   \"replicas\": 1,
                   \"placementSwarm\": {
-                    \"Constraints\": [\"node.platform.arch==x86_64\"]
+                    \"Constraints\": [\"node.role==worker\"]
                   }
                 }
               }"
-              echo "  - Build Type: Dockerfile (native build on Dokploy)"
+              echo "  - Build Type: Pre-built Docker Image (ARM64)"
+              echo "  - Image: ${IMAGE_TAG}"
               echo "  - No Docker Registry configured"
-              echo "  - Cluster Settings: 1 replica on worker nodes"
+              echo "  - Cluster Settings: 1 replica on ARM64 workers"
             fi
 
             UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
@@ -493,42 +529,47 @@ jobs:
               exit 1
             fi
 
-            # Configure application to use Dockerfile (Dokploy builds natively)
-            echo "🐳 Configuring Dockerfile build on Dokploy server..."
+            # Configure application to use pre-built Docker image
+            echo "🐳 Configuring pre-built Docker image deployment..."
 
-            # Build JSON payload for native Dockerfile build
+            # Use pre-built Docker image from registry
+            IMAGE_TAG="${{ steps.build.outputs.image_tag }}"
+
+            # Build JSON payload for pre-built Docker image deployment
             if [ -n "${DOCKER_REGISTRY_ID}" ]; then
               UPDATE_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
-                  \"buildType\": \"dockerfile\",
-                  \"dockerfile\": \"Dockerfile\",
+                  \"buildType\": \"docker\",
+                  \"dockerImage\": \"${IMAGE_TAG}\",
                   \"dockerRegistryId\": \"${DOCKER_REGISTRY_ID}\",
                   \"registryId\": \"${DOCKER_REGISTRY_ID}\",
                   \"replicas\": 1,
                   \"placementSwarm\": {
-                    \"Constraints\": [\"node.platform.arch==x86_64\"]
+                    \"Constraints\": [\"node.role==worker\"]
                   }
                 }
               }"
-              echo "  - Build Type: Dockerfile (native build on Dokploy)"
+              echo "  - Build Type: Pre-built Docker Image (ARM64)"
+              echo "  - Image: ${IMAGE_TAG}"
               echo "  - Using Docker Registry: ${DOCKER_REGISTRY_ID}"
-              echo "  - Cluster Settings: 1 replica on worker nodes"
+              echo "  - Cluster Settings: 1 replica on ARM64 workers"
             else
               UPDATE_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
-                  \"buildType\": \"dockerfile\",
-                  \"dockerfile\": \"Dockerfile\",
+                  \"buildType\": \"docker\",
+                  \"dockerImage\": \"${IMAGE_TAG}\",
                   \"replicas\": 1,
                   \"placementSwarm\": {
-                    \"Constraints\": [\"node.platform.arch==x86_64\"]
+                    \"Constraints\": [\"node.role==worker\"]
                   }
                 }
               }"
-              echo "  - Build Type: Dockerfile (native build on Dokploy)"
+              echo "  - Build Type: Pre-built Docker Image (ARM64)"
+              echo "  - Image: ${IMAGE_TAG}"
               echo "  - No Docker Registry configured"
-              echo "  - Cluster Settings: 1 replica on worker nodes"
+              echo "  - Cluster Settings: 1 replica on ARM64 workers"
             fi
 
             UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
