@@ -156,7 +156,10 @@ jobs:
             -H "x-api-key: ${DOKPLOY_API_KEY}" \
             -d '{"json":{}}')
 
-          # Debug: Show what registries exist
+          # Debug: Show raw response and parsed registries
+          echo "📋 Registry API Response:"
+          echo "$REGISTRIES" | jq '.' || echo "  (invalid JSON)"
+          echo ""
           echo "📋 Available registries:"
           echo "$REGISTRIES" | jq -r '.result.data.json[]? | "  - \(.registryName // "unnamed"): \(.registryUrl)"' || echo "  (none or error parsing)"
 
