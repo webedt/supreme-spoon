@@ -170,8 +170,8 @@ jobs:
           if [ -n "$APP_ID" ] && [ "$APP_ID" != "null" ]; then
             echo "✅ Found existing application: ${APP_ID}"
 
-            # Update existing application to use Dockerfile
-            echo "🐳 Ensuring Docker build configuration..."
+            # Update existing application to use Dockerfile with worker node constraint
+            echo "🐳 Ensuring Docker build configuration and placement constraints..."
             UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
               "${DOKPLOY_URL}/api/trpc/application.update" \
               -H 'accept: application/json' \
@@ -181,7 +181,10 @@ jobs:
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
                   \"buildType\": \"dockerfile\",
-                  \"dockerfile\": \"Dockerfile\"
+                  \"dockerfile\": \"Dockerfile\",
+                  \"placementSwarm\": {
+                    \"Constraints\": [\"node.role==worker\"]
+                  }
                 }
               }")
 
@@ -317,8 +320,8 @@ jobs:
               exit 1
             fi
 
-            # Configure application to use Dockerfile
-            echo "🐳 Configuring Docker build settings..."
+            # Configure application to use Dockerfile with worker node constraint
+            echo "🐳 Configuring Docker build settings and placement constraints..."
             UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
               "${DOKPLOY_URL}/api/trpc/application.update" \
               -H 'accept: application/json' \
@@ -328,7 +331,10 @@ jobs:
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
                   \"buildType\": \"dockerfile\",
-                  \"dockerfile\": \"Dockerfile\"
+                  \"dockerfile\": \"Dockerfile\",
+                  \"placementSwarm\": {
+                    \"Constraints\": [\"node.role==worker\"]
+                  }
                 }
               }")
 
