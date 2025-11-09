@@ -15,6 +15,9 @@ export default defineConfig({
     // Enable strict port (fail if port is already in use)
     strictPort: true,
 
+    // Allow all hosts (important for Dokploy dynamic subdomains)
+    allowedHosts: ['.etdofresh.com'],
+
     // HMR configuration
     hmr: {
       // Use the host for HMR websocket connection
