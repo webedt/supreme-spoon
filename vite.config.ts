@@ -18,13 +18,11 @@ export default defineConfig({
     // Allow all hosts (important for Dokploy dynamic subdomains)
     allowedHosts: ['.etdofresh.com'],
 
-    // HMR configuration
+    // HMR configuration for reverse proxy
+    // Let Vite automatically detect from the request
     hmr: {
-      // For proxied environments, use the browser's current host
-      // This allows HMR websocket to connect through the proxy
-      host: true,
       protocol: 'wss',
-      port: 443,
+      clientPort: 443,
     },
 
     // Watch configuration for file changes
