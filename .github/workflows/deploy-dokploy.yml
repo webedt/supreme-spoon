@@ -292,46 +292,74 @@ jobs:
           if [ -n "$APP_ID" ] && [ "$APP_ID" != "null" ]; then
             echo "✅ Found existing application: ${APP_ID}"
 
-            # Update existing application to use pre-built Docker image
-            echo "🐳 Configuring pre-built Docker image deployment..."
+            # Configure Docker provider to use pre-built image
+            echo "🐳 Configuring Docker provider for pre-built image..."
 
             # Use pre-built Docker image from registry
             IMAGE_TAG="${{ steps.build.outputs.image_tag }}"
 
-            # Build JSON payload for pre-built Docker image deployment
+            # Build JSON payload for Docker provider
             if [ -n "${DOCKER_REGISTRY_ID}" ]; then
-              UPDATE_JSON="{
+              # Get registry credentials
+              REGISTRY_INFO=$(curl -s -X 'GET' \
+                "${DOKPLOY_URL}/api/trpc/registry.one?input=%7B%22json%22%3A%7B%22registryId%22%3A%22${DOCKER_REGISTRY_ID}%22%7D%7D" \
+                -H 'accept: application/json' \
+                -H "x-api-key: ${DOKPLOY_API_KEY}")
+
+              REGISTRY_USERNAME=$(echo "$REGISTRY_INFO" | jq -r '.result.data.json.username')
+              REGISTRY_PASSWORD=$(echo "$REGISTRY_INFO" | jq -r '.result.data.json.password')
+
+              DOCKER_PROVIDER_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
                   \"dockerImage\": \"${IMAGE_TAG}\",
-                  \"dockerRegistryId\": \"${DOCKER_REGISTRY_ID}\",
-                  \"registryId\": \"${DOCKER_REGISTRY_ID}\",
-                  \"replicas\": 1,
-                  \"placementSwarm\": {
-                    \"Constraints\": [\"node.role==worker\"]
-                  }
+                  \"username\": \"${REGISTRY_USERNAME}\",
+                  \"password\": \"${REGISTRY_PASSWORD}\"
                 }
               }"
               echo "  - Deployment: Pre-built Docker Image (ARM64)"
               echo "  - Image: ${IMAGE_TAG}"
-              echo "  - Using Docker Registry: ${DOCKER_REGISTRY_ID}"
-              echo "  - Cluster Settings: 1 replica on ARM64 workers"
+              echo "  - Using Docker Registry with authentication"
             else
-              UPDATE_JSON="{
+              DOCKER_PROVIDER_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
-                  \"dockerImage\": \"${IMAGE_TAG}\",
-                  \"replicas\": 1,
-                  \"placementSwarm\": {
-                    \"Constraints\": [\"node.role==worker\"]
-                  }
+                  \"dockerImage\": \"${IMAGE_TAG}\"
                 }
               }"
               echo "  - Deployment: Pre-built Docker Image (ARM64)"
               echo "  - Image: ${IMAGE_TAG}"
-              echo "  - No Docker Registry configured"
-              echo "  - Cluster Settings: 1 replica on ARM64 workers"
+              echo "  - No Docker Registry authentication"
             fi
+
+            # Configure Docker provider (this switches from GitHub to Docker image deployment)
+            DOCKER_PROVIDER_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
+              "${DOKPLOY_URL}/api/trpc/application.saveDockerProvider" \
+              -H 'accept: application/json' \
+              -H 'Content-Type: application/json' \
+              -H "x-api-key: ${DOKPLOY_API_KEY}" \
+              -d "${DOCKER_PROVIDER_JSON}")
+
+            DOCKER_PROVIDER_HTTP_CODE=$(echo "$DOCKER_PROVIDER_RESPONSE" | tail -n1)
+            DOCKER_PROVIDER_BODY=$(echo "$DOCKER_PROVIDER_RESPONSE" | sed '$d')
+
+            if [ "$DOCKER_PROVIDER_HTTP_CODE" -ge 200 ] && [ "$DOCKER_PROVIDER_HTTP_CODE" -lt 300 ]; then
+              echo "✅ Docker provider configured successfully"
+            else
+              echo "⚠️  Warning: Failed to configure Docker provider (HTTP ${DOCKER_PROVIDER_HTTP_CODE})"
+              echo "Response: ${DOCKER_PROVIDER_BODY}"
+            fi
+
+            # Update deployment settings (replicas and placement)
+            UPDATE_JSON="{
+              \"json\": {
+                \"applicationId\": \"${APP_ID}\",
+                \"replicas\": 1,
+                \"placementSwarm\": {
+                  \"Constraints\": [\"node.role==worker\"]
+                }
+              }
+            }"
 
             UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
               "${DOKPLOY_URL}/api/trpc/application.update" \
@@ -527,46 +555,75 @@ jobs:
               exit 1
             fi
 
-            # Configure application to use pre-built Docker image
-            echo "🐳 Configuring pre-built Docker image deployment..."
+            # Configure Docker provider to use pre-built image
+            echo "🐳 Configuring Docker provider for pre-built image..."
 
             # Use pre-built Docker image from registry
             IMAGE_TAG="${{ steps.build.outputs.image_tag }}"
 
-            # Build JSON payload for pre-built Docker image deployment
+            # Build JSON payload for Docker provider
             if [ -n "${DOCKER_REGISTRY_ID}" ]; then
-              UPDATE_JSON="{
+              # Get registry credentials
+              REGISTRY_INFO=$(curl -s -X 'GET' \
+                "${DOKPLOY_URL}/api/trpc/registry.one?input=%7B%22json%22%3A%7B%22registryId%22%3A%22${DOCKER_REGISTRY_ID}%22%7D%7D" \
+                -H 'accept: application/json' \
+                -H "x-api-key: ${DOKPLOY_API_KEY}")
+
+              REGISTRY_USERNAME=$(echo "$REGISTRY_INFO" | jq -r '.result.data.json.username')
+              REGISTRY_PASSWORD=$(echo "$REGISTRY_INFO" | jq -r '.result.data.json.password')
+
+              DOCKER_PROVIDER_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
                   \"dockerImage\": \"${IMAGE_TAG}\",
-                  \"dockerRegistryId\": \"${DOCKER_REGISTRY_ID}\",
-                  \"registryId\": \"${DOCKER_REGISTRY_ID}\",
-                  \"replicas\": 1,
-                  \"placementSwarm\": {
-                    \"Constraints\": [\"node.role==worker\"]
-                  }
+                  \"username\": \"${REGISTRY_USERNAME}\",
+                  \"password\": \"${REGISTRY_PASSWORD}\"
                 }
               }"
               echo "  - Deployment: Pre-built Docker Image (ARM64)"
               echo "  - Image: ${IMAGE_TAG}"
-              echo "  - Using Docker Registry: ${DOCKER_REGISTRY_ID}"
-              echo "  - Cluster Settings: 1 replica on ARM64 workers"
+              echo "  - Using Docker Registry with authentication"
             else
-              UPDATE_JSON="{
+              DOCKER_PROVIDER_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
-                  \"dockerImage\": \"${IMAGE_TAG}\",
-                  \"replicas\": 1,
-                  \"placementSwarm\": {
-                    \"Constraints\": [\"node.role==worker\"]
-                  }
+                  \"dockerImage\": \"${IMAGE_TAG}\"
                 }
               }"
               echo "  - Deployment: Pre-built Docker Image (ARM64)"
               echo "  - Image: ${IMAGE_TAG}"
-              echo "  - No Docker Registry configured"
-              echo "  - Cluster Settings: 1 replica on ARM64 workers"
+              echo "  - No Docker Registry authentication"
             fi
+
+            # Configure Docker provider (this switches from GitHub to Docker image deployment)
+            DOCKER_PROVIDER_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
+              "${DOKPLOY_URL}/api/trpc/application.saveDockerProvider" \
+              -H 'accept: application/json' \
+              -H 'Content-Type: application/json' \
+              -H "x-api-key: ${DOKPLOY_API_KEY}" \
+              -d "${DOCKER_PROVIDER_JSON}")
+
+            DOCKER_PROVIDER_HTTP_CODE=$(echo "$DOCKER_PROVIDER_RESPONSE" | tail -n1)
+            DOCKER_PROVIDER_BODY=$(echo "$DOCKER_PROVIDER_RESPONSE" | sed '$d')
+
+            if [ "$DOCKER_PROVIDER_HTTP_CODE" -ge 200 ] && [ "$DOCKER_PROVIDER_HTTP_CODE" -lt 300 ]; then
+              echo "✅ Docker provider configured successfully"
+            else
+              echo "❌ Failed to configure Docker provider (HTTP ${DOCKER_PROVIDER_HTTP_CODE})"
+              echo "Response: ${DOCKER_PROVIDER_BODY}"
+              exit 1
+            fi
+
+            # Update deployment settings (replicas and placement)
+            UPDATE_JSON="{
+              \"json\": {
+                \"applicationId\": \"${APP_ID}\",
+                \"replicas\": 1,
+                \"placementSwarm\": {
+                  \"Constraints\": [\"node.role==worker\"]
+                }
+              }
+            }"
 
             UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
               "${DOKPLOY_URL}/api/trpc/application.update" \
@@ -579,11 +636,10 @@ jobs:
             UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
 
             if [ "$UPDATE_HTTP_CODE" -ge 200 ] && [ "$UPDATE_HTTP_CODE" -lt 300 ]; then
-              echo "✅ Docker build configuration updated successfully"
+              echo "✅ Deployment settings updated successfully"
             else
-              echo "❌ Failed to update build configuration (HTTP ${UPDATE_HTTP_CODE})"
+              echo "⚠️  Warning: Failed to update deployment settings (HTTP ${UPDATE_HTTP_CODE})"
               echo "Response: ${UPDATE_BODY}"
-              exit 1
             fi
 
             # Add domain to the application (use DOMAIN_NAME for DNS compliance)
