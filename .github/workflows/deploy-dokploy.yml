@@ -204,7 +204,7 @@ jobs:
             # Update existing application to use Dockerfile with worker node constraint
             echo "🐳 Ensuring Docker build configuration and placement constraints..."
 
-            # Build JSON payload with optional dockerRegistryId
+            # Build JSON payload with optional dockerRegistryId and cluster settings
             if [ -n "${DOCKER_REGISTRY_ID}" ]; then
               UPDATE_JSON="{
                 \"json\": {
@@ -212,24 +212,29 @@ jobs:
                   \"buildType\": \"dockerfile\",
                   \"dockerfile\": \"Dockerfile\",
                   \"dockerRegistryId\": \"${DOCKER_REGISTRY_ID}\",
+                  \"registryId\": \"${DOCKER_REGISTRY_ID}\",
+                  \"replicas\": 1,
                   \"placementSwarm\": {
                     \"Constraints\": [\"node.role==worker\"]
                   }
                 }
               }"
               echo "  - Using Docker Registry: ${DOCKER_REGISTRY_ID}"
+              echo "  - Cluster Settings: 1 replica on worker nodes"
             else
               UPDATE_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
                   \"buildType\": \"dockerfile\",
                   \"dockerfile\": \"Dockerfile\",
+                  \"replicas\": 1,
                   \"placementSwarm\": {
                     \"Constraints\": [\"node.role==worker\"]
                   }
                 }
               }"
               echo "  - No Docker Registry configured"
+              echo "  - Cluster Settings: 1 replica on worker nodes"
             fi
 
             UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
@@ -374,7 +379,7 @@ jobs:
             # Configure application to use Dockerfile with worker node constraint
             echo "🐳 Configuring Docker build settings and placement constraints..."
 
-            # Build JSON payload with optional dockerRegistryId
+            # Build JSON payload with optional dockerRegistryId and cluster settings
             if [ -n "${DOCKER_REGISTRY_ID}" ]; then
               UPDATE_JSON="{
                 \"json\": {
@@ -382,24 +387,29 @@ jobs:
                   \"buildType\": \"dockerfile\",
                   \"dockerfile\": \"Dockerfile\",
                   \"dockerRegistryId\": \"${DOCKER_REGISTRY_ID}\",
+                  \"registryId\": \"${DOCKER_REGISTRY_ID}\",
+                  \"replicas\": 1,
                   \"placementSwarm\": {
                     \"Constraints\": [\"node.role==worker\"]
                   }
                 }
               }"
               echo "  - Using Docker Registry: ${DOCKER_REGISTRY_ID}"
+              echo "  - Cluster Settings: 1 replica on worker nodes"
             else
               UPDATE_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
                   \"buildType\": \"dockerfile\",
                   \"dockerfile\": \"Dockerfile\",
+                  \"replicas\": 1,
                   \"placementSwarm\": {
                     \"Constraints\": [\"node.role==worker\"]
                   }
                 }
               }"
               echo "  - No Docker Registry configured"
+              echo "  - Cluster Settings: 1 replica on worker nodes"
             fi
 
             UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
