@@ -234,6 +234,38 @@ jobs:
             echo "registry_id=" >> $GITHUB_OUTPUT
           fi
 
+      - name: Login to Docker Registry
+        run: |
+          echo "${{ secrets.DOCKER_REGISTRY_PASSWORD }}" | docker login dockerregistry.etdofresh.com -u "${{ secrets.DOCKER_REGISTRY_USERNAME }}" --password-stdin
+
+      - name: Build and Push Docker Image
+        id: build
+        env:
+          APP_NAME: ${{ steps.metadata.outputs.app_name }}
+          SHORT_SHA: ${{ steps.metadata.outputs.short_sha }}
+        run: |
+          # Build image tag
+          IMAGE_TAG="dockerregistry.etdofresh.com/${APP_NAME}:${SHORT_SHA}"
+          IMAGE_TAG_LATEST="dockerregistry.etdofresh.com/${APP_NAME}:latest"
+
+          echo "🐳 Building Docker image for ARM64..."
+          echo "  Image: ${IMAGE_TAG}"
+
+          # Build for ARM64 using buildx with QEMU
+          docker buildx build \
+            --platform linux/arm64 \
+            --tag "${IMAGE_TAG}" \
+            --tag "${IMAGE_TAG_LATEST}" \
+            --push \
+            .
+
+          echo "✅ Image built and pushed successfully"
+          echo "  Tags:"
+          echo "    - ${IMAGE_TAG}"
+          echo "    - ${IMAGE_TAG_LATEST}"
+
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
       - name: Get or Create Dokploy Application
         id: dokploy_app
         env:
@@ -271,37 +303,42 @@ jobs:
             # Update existing application to use Dockerfile with worker node constraint
             echo "🐳 Ensuring Docker build configuration and placement constraints..."
 
-            # Build JSON payload with optional dockerRegistryId and cluster settings
+            # Use pre-built Docker image from registry
+            IMAGE_TAG="${{ steps.build.outputs.image_tag }}"
+
+            # Build JSON payload for Docker image deployment (no build, just pull)
             if [ -n "${DOCKER_REGISTRY_ID}" ]; then
               UPDATE_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
-                  \"buildType\": \"dockerfile\",
-                  \"dockerfile\": \"Dockerfile\",
+                  \"buildType\": \"docker\",
+                  \"dockerImage\": \"${IMAGE_TAG}\",
                   \"dockerRegistryId\": \"${DOCKER_REGISTRY_ID}\",
                   \"registryId\": \"${DOCKER_REGISTRY_ID}\",
                   \"replicas\": 1,
                   \"placementSwarm\": {
-                    \"Constraints\": [\"node.role==worker\", \"node.platform.arch==x86_64\"]
+                    \"Constraints\": [\"node.role==worker\"]
                   }
                 }
               }"
               echo "  - Using Docker Registry: ${DOCKER_REGISTRY_ID}"
-              echo "  - Cluster Settings: 1 replica on worker nodes"
+              echo "  - Pre-built Image: ${IMAGE_TAG}"
+              echo "  - Cluster Settings: 1 replica on worker nodes (ARM64 native)"
             else
               UPDATE_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
-                  \"buildType\": \"dockerfile\",
-                  \"dockerfile\": \"Dockerfile\",
+                  \"buildType\": \"docker\",
+                  \"dockerImage\": \"${IMAGE_TAG}\",
                   \"replicas\": 1,
                   \"placementSwarm\": {
-                    \"Constraints\": [\"node.role==worker\", \"node.platform.arch==x86_64\"]
+                    \"Constraints\": [\"node.role==worker\"]
                   }
                 }
               }"
               echo "  - No Docker Registry configured"
-              echo "  - Cluster Settings: 1 replica on worker nodes"
+              echo "  - Pre-built Image: ${IMAGE_TAG}"
+              echo "  - Cluster Settings: 1 replica on worker nodes (ARM64 native)"
             fi
 
             UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
@@ -501,37 +538,42 @@ jobs:
             # Configure application to use Dockerfile with worker node constraint
             echo "🐳 Configuring Docker build settings and placement constraints..."
 
-            # Build JSON payload with optional dockerRegistryId and cluster settings
+            # Use pre-built Docker image from registry
+            IMAGE_TAG="${{ steps.build.outputs.image_tag }}"
+
+            # Build JSON payload for Docker image deployment (no build, just pull)
             if [ -n "${DOCKER_REGISTRY_ID}" ]; then
               UPDATE_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
-                  \"buildType\": \"dockerfile\",
-                  \"dockerfile\": \"Dockerfile\",
+                  \"buildType\": \"docker\",
+                  \"dockerImage\": \"${IMAGE_TAG}\",
                   \"dockerRegistryId\": \"${DOCKER_REGISTRY_ID}\",
                   \"registryId\": \"${DOCKER_REGISTRY_ID}\",
                   \"replicas\": 1,
                   \"placementSwarm\": {
-                    \"Constraints\": [\"node.role==worker\", \"node.platform.arch==x86_64\"]
+                    \"Constraints\": [\"node.role==worker\"]
                   }
                 }
               }"
               echo "  - Using Docker Registry: ${DOCKER_REGISTRY_ID}"
-              echo "  - Cluster Settings: 1 replica on worker nodes"
+              echo "  - Pre-built Image: ${IMAGE_TAG}"
+              echo "  - Cluster Settings: 1 replica on worker nodes (ARM64 native)"
             else
               UPDATE_JSON="{
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
-                  \"buildType\": \"dockerfile\",
-                  \"dockerfile\": \"Dockerfile\",
+                  \"buildType\": \"docker\",
+                  \"dockerImage\": \"${IMAGE_TAG}\",
                   \"replicas\": 1,
                   \"placementSwarm\": {
-                    \"Constraints\": [\"node.role==worker\", \"node.platform.arch==x86_64\"]
+                    \"Constraints\": [\"node.role==worker\"]
                   }
                 }
               }"
               echo "  - No Docker Registry configured"
-              echo "  - Cluster Settings: 1 replica on worker nodes"
+              echo "  - Pre-built Image: ${IMAGE_TAG}"
+              echo "  - Cluster Settings: 1 replica on worker nodes (ARM64 native)"
             fi
 
             UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
