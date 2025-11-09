@@ -162,10 +162,65 @@ jobs:
           echo "$REGISTRIES" | jq -r '.result.data.json[]? | "  - \(.registryName // "unnamed"): \(.registryUrl)"' || echo "  (none or error parsing)"
 
           # Try to find registry by URL (case-insensitive search)
-          REGISTRY_ID=$(echo "$REGISTRIES" | jq -r '.result.data.json[]? | select(.registryUrl | ascii_downcase | contains("dockerregistry.etdofresh.com")) | .registryId' | head -n1)
+          REGISTRY_DATA=$(echo "$REGISTRIES" | jq -r '.result.data.json[]? | select(.registryUrl | ascii_downcase | contains("dockerregistry.etdofresh.com"))')
+          REGISTRY_ID=$(echo "$REGISTRY_DATA" | jq -r '.registryId')
+          REGISTRY_URL=$(echo "$REGISTRY_DATA" | jq -r '.registryUrl')
 
           if [ -n "$REGISTRY_ID" ] && [ "$REGISTRY_ID" != "null" ]; then
             echo "✅ Found Docker registry: ${REGISTRY_ID}"
+            echo "  Current URL: ${REGISTRY_URL}"
+
+            # Check if the URL contains https:// or http:// protocol
+            if echo "$REGISTRY_URL" | grep -qE '^https?://'; then
+              echo "⚠️  Registry URL contains protocol prefix (https:// or http://)"
+              echo "   This will cause Docker image reference errors."
+              echo "   Docker registries should be configured with hostname only."
+              echo ""
+              echo "🔧 Fixing registry URL by removing protocol..."
+
+              # Remove protocol from URL
+              FIXED_URL=$(echo "$REGISTRY_URL" | sed -E 's|^https?://||')
+              echo "  Old URL: ${REGISTRY_URL}"
+              echo "  New URL: ${FIXED_URL}"
+
+              # Get all registry fields for update
+              REGISTRY_NAME=$(echo "$REGISTRY_DATA" | jq -r '.registryName')
+              REGISTRY_USERNAME=$(echo "$REGISTRY_DATA" | jq -r '.username')
+              SELF_HOSTED=$(echo "$REGISTRY_DATA" | jq -r '.selfHosted')
+              IMAGE_PREFIX=$(echo "$REGISTRY_DATA" | jq -r '.imagePrefix')
+
+              # Update the registry with corrected URL
+              UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
+                "${DOKPLOY_URL}/api/trpc/registry.update" \
+                -H 'accept: application/json' \
+                -H 'Content-Type: application/json' \
+                -H "x-api-key: ${DOKPLOY_API_KEY}" \
+                -d "{
+                  \"json\": {
+                    \"registryId\": \"${REGISTRY_ID}\",
+                    \"registryUrl\": \"${FIXED_URL}\",
+                    \"registryName\": \"${REGISTRY_NAME}\",
+                    \"username\": \"${REGISTRY_USERNAME}\",
+                    \"selfHosted\": ${SELF_HOSTED},
+                    \"imagePrefix\": \"${IMAGE_PREFIX}\"
+                  }
+                }")
+
+              UPDATE_HTTP_CODE=$(echo "$UPDATE_RESPONSE" | tail -n1)
+              UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
+
+              if [ "$UPDATE_HTTP_CODE" -ge 200 ] && [ "$UPDATE_HTTP_CODE" -lt 300 ]; then
+                echo "✅ Registry URL updated successfully!"
+                echo "  Response Code: ${UPDATE_HTTP_CODE}"
+              else
+                echo "❌ Failed to update registry URL (HTTP ${UPDATE_HTTP_CODE})"
+                echo "Response: ${UPDATE_BODY}"
+                echo "⚠️  Continuing with original registry configuration..."
+              fi
+            else
+              echo "✅ Registry URL format is correct (no protocol prefix)"
+            fi
+
             echo "registry_id=${REGISTRY_ID}" >> $GITHUB_OUTPUT
           else
             echo "⚠️  Docker registry 'dockerregistry.etdofresh.com' not found"
