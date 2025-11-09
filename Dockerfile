@@ -12,8 +12,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Disable V8 JIT compilation to avoid QEMU memory permission issues
-ENV NODE_OPTIONS="--jitless"
+# V8 flags to work around QEMU emulation issues while keeping WebAssembly
+# --no-opt disables optimizing compiler, --no-turbo-fan disables turbofan JIT
+ENV NODE_OPTIONS="--no-opt"
 
 # Expose Vite dev server port
 EXPOSE 5173
