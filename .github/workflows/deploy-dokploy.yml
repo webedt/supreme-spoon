@@ -149,12 +149,10 @@ jobs:
           echo "🔍 Looking for Docker registry 'dockerregistry.etdofresh.com'..."
 
           # Get all registries
-          REGISTRIES=$(curl -s -X 'POST' \
+          REGISTRIES=$(curl -s -X 'GET' \
             "${DOKPLOY_URL}/api/trpc/registry.all" \
             -H 'accept: application/json' \
-            -H 'Content-Type: application/json' \
-            -H "x-api-key: ${DOKPLOY_API_KEY}" \
-            -d '{"json":{}}')
+            -H "x-api-key: ${DOKPLOY_API_KEY}")
 
           # Debug: Show raw response and parsed registries
           echo "📋 Registry API Response:"
