@@ -22,23 +22,11 @@ export default defineConfig({
       clientPort: 5173,
     },
 
-    // Watch configuration
+    // Watch configuration for file changes
     watch: {
       // Poll for changes (useful in Docker volumes on some systems)
-      // usePolling: true,
-      // interval: 100,
+      usePolling: true,
+      interval: 100,
     },
-  },
-
-  // Build configuration
-  build: {
-    // Output directory
-    outDir: 'dist',
-
-    // Generate source maps for production debugging
-    sourcemap: false,
-
-    // Minify with esbuild (faster than terser)
-    minify: 'esbuild',
   },
 })

@@ -27,9 +27,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build project
-        run: npm run build
-
       - name: Generate deployment metadata
         id: metadata
         run: |
@@ -404,7 +401,7 @@ jobs:
                     \"applicationId\": \"${APP_ID}\",
                     \"host\": \"${DOMAIN}\",
                     \"path\": \"/\",
-                    \"port\": 80,
+                    \"port\": 5173,
                     \"https\": true,
                     \"certificateType\": \"letsencrypt\",
                     \"domainType\": \"application\"
@@ -635,7 +632,7 @@ jobs:
                     \"applicationId\": \"${APP_ID}\",
                     \"host\": \"${DOMAIN}\",
                     \"path\": \"/\",
-                    \"port\": 80,
+                    \"port\": 5173,
                     \"https\": true,
                     \"certificateType\": \"letsencrypt\",
                     \"domainType\": \"application\"
@@ -663,7 +660,7 @@ jobs:
           echo "  - ID: ${APP_ID}"
           echo "  - Name: ${APP_NAME}"
           echo "  - Domain: https://${DOMAIN_NAME}.etdofresh.com"
-          echo "  - Port: 80"
+          echo "  - Port: 5173 (Vite Dev Server)"
           echo "  - Environment: ${DOKPLOY_ENVIRONMENT_ID}"
 
 
