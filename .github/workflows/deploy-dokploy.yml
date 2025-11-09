@@ -275,7 +275,7 @@ jobs:
                   \"registryId\": \"${DOCKER_REGISTRY_ID}\",
                   \"replicas\": 1,
                   \"placementSwarm\": {
-                    \"Constraints\": [\"node.role==worker\"]
+                    \"Constraints\": [\"node.platform.arch==x86_64\"]
                   }
                 }
               }"
@@ -290,7 +290,7 @@ jobs:
                   \"dockerfile\": \"Dockerfile\",
                   \"replicas\": 1,
                   \"placementSwarm\": {
-                    \"Constraints\": [\"node.role==worker\"]
+                    \"Constraints\": [\"node.platform.arch==x86_64\"]
                   }
                 }
               }"
@@ -507,7 +507,7 @@ jobs:
                   \"registryId\": \"${DOCKER_REGISTRY_ID}\",
                   \"replicas\": 1,
                   \"placementSwarm\": {
-                    \"Constraints\": [\"node.role==worker\"]
+                    \"Constraints\": [\"node.platform.arch==x86_64\"]
                   }
                 }
               }"
@@ -522,7 +522,7 @@ jobs:
                   \"dockerfile\": \"Dockerfile\",
                   \"replicas\": 1,
                   \"placementSwarm\": {
-                    \"Constraints\": [\"node.role==worker\"]
+                    \"Constraints\": [\"node.platform.arch==x86_64\"]
                   }
                 }
               }"
