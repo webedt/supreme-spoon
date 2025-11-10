@@ -1,9 +1,11 @@
 import express, { Request, Response } from 'express'
 import cors from 'cors'
 import { Pool } from 'pg'
+import { createProxyMiddleware } from 'http-proxy-middleware'
 
 const app = express()
 const PORT = process.env.PORT || 3000
+const isDevelopment = process.env.NODE_ENV !== 'production'
 
 // Middleware
 app.use(cors())
@@ -180,8 +182,29 @@ app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// Serve static files in production
-if (process.env.NODE_ENV === 'production') {
+// Development: Proxy to Vite dev server (with HMR support)
+if (isDevelopment) {
+  const VITE_PORT = process.env.VITE_PORT || 5173
+  const VITE_HOST = process.env.VITE_HOST || 'localhost'
+
+  // Proxy all non-API requests to Vite dev server
+  app.use(
+    '/',
+    createProxyMiddleware({
+      target: `http://${VITE_HOST}:${VITE_PORT}`,
+      changeOrigin: true,
+      ws: true, // Enable WebSocket proxying for HMR
+      logLevel: 'silent',
+      // Only proxy non-API requests
+      filter: (pathname) => !pathname.startsWith('/api') && pathname !== '/health',
+    })
+  )
+
+  console.log(`🔄 Development mode: Proxying to Vite dev server at http://${VITE_HOST}:${VITE_PORT}`)
+}
+
+// Production: Serve static files
+if (!isDevelopment) {
   app.use(express.static('dist'))
 
   // Catch-all route for SPA - must be last
