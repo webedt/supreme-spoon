@@ -266,6 +266,7 @@ jobs:
           DOKPLOY_PROJECT_ID: ${{ vars.DOKPLOY_PROJECT_ID }}
           DOKPLOY_ENVIRONMENT_ID: ${{ vars.DOKPLOY_ENVIRONMENT_ID }}
           DOKPLOY_GITHUB_ID: ${{ vars.DOKPLOY_GITHUB_ID }}
+          DOKPLOY_SERVER_ID: ${{ vars.DOKPLOY_SERVER_ID }}
           DOCKER_REGISTRY_ID: ${{ steps.registry.outputs.registry_id }}
           APP_NAME: ${{ steps.metadata.outputs.app_name }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -499,7 +500,7 @@ jobs:
             echo "  - Branch: ${GITHUB_BRANCH}"
             echo "  - GitHub ID: ${DOKPLOY_GITHUB_ID}"
 
-            # Create new application (basic fields only)
+            # Create new application (with server ID for cloud provider)
             CREATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
               "${DOKPLOY_URL}/api/trpc/application.create" \
               -H 'accept: application/json' \
@@ -509,7 +510,8 @@ jobs:
                 \"json\": {
                   \"name\": \"${APP_NAME}\",
                   \"projectId\": \"${DOKPLOY_PROJECT_ID}\",
-                  \"environmentId\": \"${DOKPLOY_ENVIRONMENT_ID}\"
+                  \"environmentId\": \"${DOKPLOY_ENVIRONMENT_ID}\",
+                  \"serverId\": \"${DOKPLOY_SERVER_ID}\"
                 }
               }")
 
