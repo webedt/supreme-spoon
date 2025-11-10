@@ -33,13 +33,13 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: linear-gradient(135deg, #0a2e0a 0%, #1a4d1a 25%, #2d5016 75%, #3a6030 100%);
+  background: linear-gradient(135deg, #0a0a2e 0%, #1a1a4d 25%, #16213e 75%, #0f3460 100%);
   color: var(--text-color);
   transition: background 0.3s ease, color 0.3s ease;
 }
 
 :root.light body {
-  background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c8 50%, #a8d5a8 100%);
+  background: linear-gradient(135deg, #e8f0f8 0%, #c8d9ec 50%, #a8c5dc 100%);
 }
 
 #app {
