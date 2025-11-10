@@ -161,7 +161,7 @@ jobs:
           DOKPLOY_ENVIRONMENT_ID: ${{ vars.DOKPLOY_ENVIRONMENT_ID }}
           DOKPLOY_GITHUB_ID: ${{ vars.DOKPLOY_GITHUB_ID }}
           DOKPLOY_SERVER_ID: ${{ vars.DOKPLOY_SERVER_ID }}
-          DOKPLOY_REGISTRY_ID: ${{ vars.DOKPLOY_REGISTRY_ID }}
+          # DOKPLOY_REGISTRY_ID: ${{ vars.DOKPLOY_REGISTRY_ID }}
           APP_NAME: ${{ steps.metadata.outputs.app_name }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_BRANCH: ${{ github.ref_name }}
@@ -229,14 +229,13 @@ jobs:
               echo "Response: ${GITHUB_BODY}"
             fi
 
-            # Update deployment settings (replicas, build type, and registry)
+            # Update deployment settings (replicas, build type)
             UPDATE_JSON="{
               \"json\": {
                 \"applicationId\": \"${APP_ID}\",
                 \"replicas\": 1,
                 \"buildType\": \"dockerfile\",
-                \"dockerfile\": \"Dockerfile\",
-                \"registryId\": \"${DOKPLOY_REGISTRY_ID}\"
+                \"dockerfile\": \"Dockerfile\"
               }
             }"
 
@@ -251,7 +250,7 @@ jobs:
             UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
 
             if [ "$UPDATE_HTTP_CODE" -ge 200 ] && [ "$UPDATE_HTTP_CODE" -lt 300 ]; then
-              echo "✅ Deployment settings updated successfully (using Dockerfile with custom registry: ${DOKPLOY_REGISTRY_ID})"
+              echo "✅ Deployment settings updated successfully (using Dockerfile)"
             else
               echo "⚠️  Warning: Failed to update deployment settings (HTTP ${UPDATE_HTTP_CODE})"
               echo "Response: ${UPDATE_BODY}"
@@ -328,14 +327,13 @@ jobs:
               exit 1
             fi
 
-            # Update deployment settings (replicas, build type, and registry)
+            # Update deployment settings (replicas, build type)
             UPDATE_JSON="{
               \"json\": {
                 \"applicationId\": \"${APP_ID}\",
                 \"replicas\": 1,
                 \"buildType\": \"dockerfile\",
-                \"dockerfile\": \"Dockerfile\",
-                \"registryId\": \"${DOKPLOY_REGISTRY_ID}\"
+                \"dockerfile\": \"Dockerfile\"
               }
             }"
 
@@ -350,7 +348,7 @@ jobs:
             UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
 
             if [ "$UPDATE_HTTP_CODE" -ge 200 ] && [ "$UPDATE_HTTP_CODE" -lt 300 ]; then
-              echo "✅ Deployment settings updated successfully (using Dockerfile with custom registry: ${DOKPLOY_REGISTRY_ID})"
+              echo "✅ Deployment settings updated successfully (using Dockerfile)"
             else
               echo "⚠️  Warning: Failed to update deployment settings (HTTP ${UPDATE_HTTP_CODE})"
               echo "Response: ${UPDATE_BODY}"
