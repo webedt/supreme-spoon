@@ -372,6 +372,117 @@ deploy:
 4. **Execute Operation**: Call the appropriate endpoint (deploy, start, stop, etc.)
 5. **Monitor Results**: Check response status and logs
 
+## Getting Deployment URLs
+
+When using the GitHub Actions workflow in this repository, each deployment automatically gets a unique URL. Here's how to find your deployment URL:
+
+### Automatic URL Generation
+
+The workflow generates deployment URLs based on the naming pattern:
+
+```
+https://{domain_name}.etdofresh.com
+```
+
+Where `{domain_name}` is typically: `{owner}-{repo}-{branch}` (all lowercase, slashes replaced with hyphens)
+
+**Example:**
+- Repository: `webedt/supreme-spoon`
+- Branch: `claude/change-background-011CUzsFu8wECBpku6BKFkPj`
+- Generated URL: `https://supreme-spoon-claude-change-background-011cuzsfu8wecbpku6bkfkpj.etdofresh.com`
+
+### Finding Your Deployment URL
+
+#### Method 1: GitHub Actions Summary (Recommended)
+
+1. Go to your repository on GitHub
+2. Click the **Actions** tab
+3. Select the latest workflow run
+4. Scroll to the bottom to see the **Deployment Summary**
+5. The deployment URL will be displayed as: **Access your application at: https://...**
+
+#### Method 2: Dokploy Dashboard
+
+1. Log into your Dokploy instance
+2. Navigate to your project (e.g., "Sessions")
+3. Find your application in the list
+4. Click on the application to view details
+5. Check the **Domains** section for the configured URL
+
+#### Method 3: Using the API
+
+Retrieve application details and domains programmatically:
+
+```bash
+# Get all projects and their applications
+curl -X 'GET' \
+  'https://dokploy.etdofresh.com/api/project.all' \
+  -H 'accept: application/json' \
+  -H 'x-api-key: YOUR-API-KEY' | jq '.'
+
+# Find your application and check the domains array
+```
+
+Or get details for a specific application:
+
+```bash
+curl -X 'POST' \
+  'https://dokploy.etdofresh.com/api/trpc/application.one' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: YOUR-API-KEY' \
+  -d '{
+    "json": {
+      "applicationId": "your-application-id"
+    }
+  }' | jq '.result.data.json.domains'
+```
+
+### Domain Name Length Constraints
+
+DNS subdomains have a 63-character limit. The workflow uses a progressive fallback strategy:
+
+1. **Strategy 1** (Preferred): `{owner}-{repo}-{branch}`
+2. **Strategy 2**: `{repo}-{branch}` (drops owner if too long)
+3. **Strategy 3**: `{owner}-{repo}-{branch-unique-part}` (extracts key part of branch)
+4. **Strategy 4**: `{repo}-{branch-unique-part}`
+5. **Strategy 5**: `{owner}-{repo}` (drops branch entirely)
+6. **Strategy 6**: `{repo}` (minimal fallback)
+7. **Strategy 7**: Hash-based name (last resort)
+
+The workflow logs which strategy was used during deployment.
+
+### Application Naming
+
+Note that the **application name in Dokploy** (no length limit) may differ from the **domain name** (63-char limit):
+
+- **Application Name**: `webedt-supreme-spoon-claude-change-background-011cuzsfu8wecbpku6bkfkpj` (full name)
+- **Domain Name**: `supreme-spoon-claude-change-background-011cuzsfu8wecbpku6bkfkpj` (may be shortened)
+
+### Updating Application Domains
+
+To add or modify domains via API:
+
+```bash
+# Add a new domain to an application
+curl -X 'POST' \
+  'https://dokploy.etdofresh.com/api/trpc/domain.create' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: YOUR-API-KEY' \
+  -d '{
+    "json": {
+      "applicationId": "your-application-id",
+      "host": "your-custom-domain.com",
+      "path": "/",
+      "port": 5173,
+      "https": true,
+      "certificateType": "letsencrypt",
+      "domainType": "application"
+    }
+  }'
+```
+
 ## Additional Resources
 
 - Official Dokploy API Documentation: https://docs.dokploy.com/docs/api
