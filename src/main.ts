@@ -62,7 +62,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   </header>
   <div class="content">
     <div class="main-content">
-      <h1>Hello World! 123 456</h1>
+      <h1>Hello World!</h1>
       <p class="message">
         Welcome to your Vite + TypeScript project
       </p>
