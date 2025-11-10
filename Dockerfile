@@ -1,4 +1,4 @@
-# Development server with HMR
+# Production build with backend server
 FROM node:20
 
 WORKDIR /app
@@ -12,8 +12,14 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Expose Vite dev server port
-EXPOSE 5173
+# Build frontend
+RUN npm run build
 
-# Start Vite dev server with HMR
-CMD ["npm", "run", "dev"]
+# Expose backend API port
+EXPOSE 3000
+
+# Set environment to production
+ENV NODE_ENV=production
+
+# Start backend server (serves API and static frontend files)
+CMD ["npm", "run", "start"]

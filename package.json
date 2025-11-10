@@ -4,12 +4,27 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"npm run server:dev\" \"vite\"",
+    "dev:frontend": "vite",
+    "dev:backend": "tsx watch server/index.ts",
+    "server:dev": "tsx watch server/index.ts",
     "build": "tsc && vite build",
+    "start": "NODE_ENV=production tsx server/index.ts",
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.5",
+    "@types/node": "^24.10.0",
+    "@types/pg": "^8.15.6",
+    "concurrently": "^9.2.1",
+    "tsx": "^4.20.6",
     "typescript": "^5.6.2",
     "vite": "^6.0.1"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "pg": "^8.16.3"
   }
 }
