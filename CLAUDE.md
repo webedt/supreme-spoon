@@ -1,5 +1,18 @@
 # Dokploy API Usage Instructions
 
+## Claude Instructions
+
+**IMPORTANT**: When working with this repository, always follow these guidelines:
+
+### After Git Push
+- **ALWAYS** display the deployment URL after a successful `git push`
+- The deployment URL format is: `https://{repo-name}-{branch-name}.etdofresh.com`
+  - Repository name: `supreme-spoon`
+  - Branch name: Current branch (lowercase, special chars replaced with hyphens)
+  - Example: `https://supreme-spoon-claude-add-sidebar-pages-011cuzvwtxvc5aagjgbmt3eh.etdofresh.com`
+- Display the URL as a clickable markdown link
+- Remind the user that the deployment will be live once the GitHub Actions workflow completes
+
 ## Overview
 
 Dokploy provides a comprehensive REST API for managing applications, databases, and deployments programmatically. The API is particularly useful for CI/CD pipelines, automation scripts, and custom integrations.
