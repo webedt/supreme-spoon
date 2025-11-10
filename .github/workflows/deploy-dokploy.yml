@@ -307,6 +307,7 @@ jobs:
                 -H 'accept: application/json' \
                 -H "x-api-key: ${DOKPLOY_API_KEY}")
 
+              REGISTRY_URL=$(echo "$REGISTRY_INFO" | jq -r '.result.data.json.registryUrl')
               REGISTRY_USERNAME=$(echo "$REGISTRY_INFO" | jq -r '.result.data.json.username')
               REGISTRY_PASSWORD=$(echo "$REGISTRY_INFO" | jq -r '.result.data.json.password')
 
@@ -314,6 +315,7 @@ jobs:
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
                   \"dockerImage\": \"${IMAGE_TAG}\",
+                  \"registryUrl\": \"${REGISTRY_URL}\",
                   \"username\": \"${REGISTRY_USERNAME}\",
                   \"password\": \"${REGISTRY_PASSWORD}\"
                 }
@@ -571,6 +573,7 @@ jobs:
                 -H 'accept: application/json' \
                 -H "x-api-key: ${DOKPLOY_API_KEY}")
 
+              REGISTRY_URL=$(echo "$REGISTRY_INFO" | jq -r '.result.data.json.registryUrl')
               REGISTRY_USERNAME=$(echo "$REGISTRY_INFO" | jq -r '.result.data.json.username')
               REGISTRY_PASSWORD=$(echo "$REGISTRY_INFO" | jq -r '.result.data.json.password')
 
@@ -578,6 +581,7 @@ jobs:
                 \"json\": {
                   \"applicationId\": \"${APP_ID}\",
                   \"dockerImage\": \"${IMAGE_TAG}\",
+                  \"registryUrl\": \"${REGISTRY_URL}\",
                   \"username\": \"${REGISTRY_USERNAME}\",
                   \"password\": \"${REGISTRY_PASSWORD}\"
                 }
