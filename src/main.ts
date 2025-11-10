@@ -14,7 +14,7 @@ interface Session {
   updatedAt?: string   // For backwards compatibility
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:3000')
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.PROD ? '' : 'http://localhost:3000')
 const CURRENT_SESSION_KEY = 'currentSession'
 
 // Cache for sessions to avoid excessive API calls
@@ -124,8 +124,22 @@ async function deleteSession(sessionId: string): Promise<void> {
 
 // Theme management
 const THEME_KEY = 'theme'
-const THEME_LIGHT = 'light'
-const THEME_DARK = 'dark'
+
+interface ThemeOption {
+  id: string
+  name: string
+  icon: string
+}
+
+const themes: ThemeOption[] = [
+  { id: 'dark', name: 'Dark', icon: '🌙' },
+  { id: 'light', name: 'Light', icon: '☀️' },
+  { id: 'blue', name: 'Ocean Blue', icon: '🌊' },
+  { id: 'purple', name: 'Purple Dream', icon: '💜' },
+  { id: 'green', name: 'Forest Green', icon: '🌲' },
+  { id: 'sunset', name: 'Sunset', icon: '🌅' },
+  { id: 'rose', name: 'Rose Pink', icon: '🌹' }
+]
 
 function getStoredTheme(): string | null {
   return localStorage.getItem(THEME_KEY)
@@ -136,7 +150,7 @@ function setStoredTheme(theme: string): void {
 }
 
 function getSystemTheme(): string {
-  return window.matchMedia('(prefers-color-scheme: light)').matches ? THEME_LIGHT : THEME_DARK
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
 }
 
 function getCurrentTheme(): string {
@@ -145,31 +159,57 @@ function getCurrentTheme(): string {
 
 function applyTheme(theme: string): void {
   const root = document.documentElement
-  if (theme === THEME_LIGHT) {
-    root.classList.add('light')
-    root.classList.remove('dark')
-  } else {
-    root.classList.add('dark')
-    root.classList.remove('light')
-  }
+  // Remove all theme classes
+  themes.forEach(t => root.classList.remove(t.id))
+  // Add the selected theme class
+  root.classList.add(theme)
 }
 
-function toggleTheme(): void {
-  const currentTheme = getCurrentTheme()
-  const newTheme = currentTheme === THEME_LIGHT ? THEME_DARK : THEME_LIGHT
-  setStoredTheme(newTheme)
-  applyTheme(newTheme)
+function selectTheme(themeId: string): void {
+  setStoredTheme(themeId)
+  applyTheme(themeId)
   updateThemeButton()
+  closeThemeDropdown()
 }
 
 function updateThemeButton(): void {
   const button = document.querySelector<HTMLButtonElement>('#theme-toggle')
   if (button) {
     const currentTheme = getCurrentTheme()
-    const icon = currentTheme === THEME_LIGHT ? '🌙' : '☀️'
-    const label = currentTheme === THEME_LIGHT ? 'Dark' : 'Light'
-    button.innerHTML = `${icon} ${label}`
+    const theme = themes.find(t => t.id === currentTheme) || themes[0]
+    button.innerHTML = `${theme.icon} ${theme.name} <span style="margin-left: 0.25rem;">▼</span>`
   }
+}
+
+function toggleThemeDropdown(): void {
+  const dropdown = document.querySelector<HTMLDivElement>('#theme-dropdown')
+  if (dropdown) {
+    dropdown.classList.toggle('show')
+  }
+}
+
+function closeThemeDropdown(): void {
+  const dropdown = document.querySelector<HTMLDivElement>('#theme-dropdown')
+  if (dropdown) {
+    dropdown.classList.remove('show')
+  }
+}
+
+function renderThemeDropdown(): string {
+  const currentTheme = getCurrentTheme()
+  return `
+    <div id="theme-dropdown" class="theme-dropdown">
+      ${themes.map(theme => `
+        <button
+          class="theme-option ${theme.id === currentTheme ? 'active' : ''}"
+          data-theme="${theme.id}"
+        >
+          <span class="theme-option-icon">${theme.icon}</span>
+          <span class="theme-option-name">${theme.name}</span>
+        </button>
+      `).join('')}
+    </div>
+  `
 }
 
 // Page definitions
@@ -191,9 +231,23 @@ const pages: Page[] = [
         <p class="message">
           This is your home page. Use the sidebar to navigate between different pages.
         </p>
+        <div style="margin: 2rem 0;">
+          <img
+            src="https://images.unsplash.com/photo-1618005198919-d3d4b5a92ead?w=800&h=400&fit=crop"
+            alt="Modern workspace"
+            style="width: 100%; max-width: 800px; height: 400px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);"
+          />
+        </div>
         <div class="card">
           <h2>Getting Started</h2>
           <p>You can add more pages by updating the pages array in main.ts</p>
+          <div style="margin: 1.5rem 0;">
+            <img
+              src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&h=300&fit=crop"
+              alt="Coding setup"
+              style="width: 100%; max-width: 600px; height: 300px; object-fit: cover; border-radius: 8px; margin-bottom: 1rem;"
+            />
+          </div>
           <button id="counter" type="button">Count is 0</button>
         </div>
       </div>
@@ -285,12 +339,26 @@ const pages: Page[] = [
         <p class="message">
           This is a multi-page application built with vanilla TypeScript and Vite.
         </p>
+        <div style="margin: 2rem 0;">
+          <img
+            src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&h=400&fit=crop"
+            alt="Team collaboration"
+            style="width: 100%; max-width: 800px; height: 400px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);"
+          />
+        </div>
         <div class="card">
           <h2>Features</h2>
+          <div style="margin: 1.5rem 0;">
+            <img
+              src="https://images.unsplash.com/photo-1551650975-87deedd944c3?w=600&h=250&fit=crop"
+              alt="Technology"
+              style="width: 100%; max-width: 600px; height: 250px; object-fit: cover; border-radius: 8px; margin-bottom: 1rem;"
+            />
+          </div>
           <ul style="text-align: left; max-width: 400px; margin: 0 auto;">
             <li>Sidebar navigation</li>
             <li>Multiple pages</li>
-            <li>Dark/Light theme toggle</li>
+            <li>Multiple theme options</li>
             <li>Hash-based routing</li>
             <li>TypeScript support</li>
           </ul>
@@ -620,13 +688,14 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         <button id="menu-toggle" class="menu-toggle" type="button" aria-label="Toggle menu">
           <span class="hamburger"></span>
         </button>
-        <h2 class="app-title">My App</h2>
+        <h2 class="app-title">Example Application</h2>
       </div>
       <h1 class="page-title">${pages.find(p => p.id === getCurrentPage())?.title || 'Home'}</h1>
       <div class="header-right">
-        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle theme">
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Select theme">
           ☀️ Light
         </button>
+        ${renderThemeDropdown()}
       </div>
     </header>
     <div class="content-wrapper">
@@ -654,7 +723,26 @@ updateThemeButton()
 
 // Set up theme toggle listener
 const themeButton = document.querySelector<HTMLButtonElement>('#theme-toggle')!
-themeButton.addEventListener('click', toggleTheme)
+themeButton.addEventListener('click', (e) => {
+  e.stopPropagation()
+  toggleThemeDropdown()
+})
+
+// Set up theme option listeners
+document.querySelectorAll('.theme-option').forEach(option => {
+  option.addEventListener('click', (e) => {
+    e.stopPropagation()
+    const themeId = option.getAttribute('data-theme')
+    if (themeId) {
+      selectTheme(themeId)
+    }
+  })
+})
+
+// Close dropdown when clicking outside
+document.addEventListener('click', () => {
+  closeThemeDropdown()
+})
 
 // Set up menu toggle listener
 const menuButton = document.querySelector<HTMLButtonElement>('#menu-toggle')!
@@ -691,7 +779,7 @@ renderPage(getCurrentPage())
 window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
   // Only update if user hasn't manually set a preference
   if (!getStoredTheme()) {
-    applyTheme(e.matches ? THEME_LIGHT : THEME_DARK)
+    applyTheme(e.matches ? 'light' : 'dark')
     updateThemeButton()
   }
 })
