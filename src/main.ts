@@ -164,32 +164,68 @@ function attachPageEventListeners(pageId: string): void {
   }
 }
 
+// Sidebar state management
+const SIDEBAR_STATE_KEY = 'sidebar-collapsed'
+
+function getSidebarState(): boolean {
+  const stored = localStorage.getItem(SIDEBAR_STATE_KEY)
+  return stored === 'true'
+}
+
+function setSidebarState(collapsed: boolean): void {
+  localStorage.setItem(SIDEBAR_STATE_KEY, collapsed.toString())
+}
+
+function toggleSidebar(): void {
+  const sidebar = document.querySelector('.sidebar')
+  const appContainer = document.querySelector('.app-container')
+
+  if (sidebar && appContainer) {
+    const isCollapsed = sidebar.classList.contains('collapsed')
+
+    if (isCollapsed) {
+      sidebar.classList.remove('collapsed')
+      appContainer.classList.remove('sidebar-collapsed')
+      setSidebarState(false)
+    } else {
+      sidebar.classList.add('collapsed')
+      appContainer.classList.add('sidebar-collapsed')
+      setSidebarState(true)
+    }
+  }
+}
+
 // Initialize theme on load
 applyTheme(getCurrentTheme())
 
 // Set up HTML structure with sidebar
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-  <div class="app-container">
-    <aside class="sidebar">
-      <div class="sidebar-header">
-        <h2 class="sidebar-title">My App</h2>
+  <div class="app-container${getSidebarState() ? ' sidebar-collapsed' : ''}">
+    <header class="header">
+      <div class="header-left">
+        <button id="menu-toggle" class="menu-toggle" type="button" aria-label="Toggle menu">
+          <span class="hamburger"></span>
+        </button>
+        <h2 class="app-title">My App</h2>
       </div>
-      <nav class="sidebar-nav">
-        ${pages.map(page => `
-          <a href="#${page.id}" class="nav-item" data-page="${page.id}">
-            <span class="nav-icon">${page.icon}</span>
-            <span class="nav-text">${page.title}</span>
-          </a>
-        `).join('')}
-      </nav>
-    </aside>
-    <div class="main-container">
-      <header class="header">
-        <h1 class="page-title">${pages.find(p => p.id === getCurrentPage())?.title || 'Home'}</h1>
+      <h1 class="page-title">${pages.find(p => p.id === getCurrentPage())?.title || 'Home'}</h1>
+      <div class="header-right">
         <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle theme">
           ☀️ Light
         </button>
-      </header>
+      </div>
+    </header>
+    <div class="content-wrapper">
+      <aside class="sidebar${getSidebarState() ? ' collapsed' : ''}">
+        <nav class="sidebar-nav">
+          ${pages.map(page => `
+            <a href="#${page.id}" class="nav-item" data-page="${page.id}">
+              <span class="nav-icon">${page.icon}</span>
+              <span class="nav-text">${page.title}</span>
+            </a>
+          `).join('')}
+        </nav>
+      </aside>
       <main class="content">
         <div id="page-content" class="page-container">
           <!-- Page content will be rendered here -->
@@ -206,6 +242,10 @@ updateThemeButton()
 const themeButton = document.querySelector<HTMLButtonElement>('#theme-toggle')!
 themeButton.addEventListener('click', toggleTheme)
 
+// Set up menu toggle listener
+const menuButton = document.querySelector<HTMLButtonElement>('#menu-toggle')!
+menuButton.addEventListener('click', toggleSidebar)
+
 // Set up navigation listeners
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', (e) => {
@@ -213,6 +253,12 @@ document.querySelectorAll('.nav-item').forEach(item => {
     const pageId = item.getAttribute('data-page')
     if (pageId) {
       navigateToPage(pageId)
+
+      // On mobile, close sidebar after navigation
+      const sidebar = document.querySelector('.sidebar')
+      if (sidebar && window.innerWidth <= 768) {
+        toggleSidebar()
+      }
     }
   })
 })
