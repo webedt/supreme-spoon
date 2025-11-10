@@ -1,4 +1,7 @@
 import './style.css'
+import { router } from './router'
+import { Sidebar } from './sidebar'
+import { renderHomePage } from './pages/home'
 
 // Theme management
 const THEME_KEY = 'theme'
@@ -53,25 +56,40 @@ function updateThemeButton(): void {
 // Initialize theme on load
 applyTheme(getCurrentTheme())
 
+// Register routes
+router.addRoute({
+  path: '/',
+  title: 'Home',
+  render: renderHomePage
+})
+
 // Set up HTML structure
-document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-  <header class="header">
-    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle theme">
-      ☀️ Light
-    </button>
-  </header>
-  <div class="content">
-    <div class="main-content">
-      <h1>Hello World!</h1>
-      <p class="message">
-        Welcome to your Vite + TypeScript project
-      </p>
-      <div class="card">
-        <button id="counter" type="button">Count is 100</button>
+const appElement = document.querySelector<HTMLDivElement>('#app')!
+appElement.innerHTML = `
+  <div id="sidebar-container"></div>
+  <div class="main-wrapper">
+    <header class="header">
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle theme">
+        ☀️ Light
+      </button>
+    </header>
+    <div class="content">
+      <div class="main-content" id="main-content">
+        <!-- Content will be rendered here by router -->
       </div>
     </div>
   </div>
 `
+
+// Initialize sidebar
+const sidebar = new Sidebar()
+const sidebarContainer = document.querySelector('#sidebar-container')!
+sidebarContainer.appendChild(sidebar.getElement())
+sidebar.updateNavigation()
+
+// Set content element for router
+const contentElement = document.querySelector<HTMLElement>('#main-content')!
+router.setContentElement(contentElement)
 
 // Update theme button to show current state
 updateThemeButton()
@@ -80,12 +98,14 @@ updateThemeButton()
 const themeButton = document.querySelector<HTMLButtonElement>('#theme-toggle')!
 themeButton.addEventListener('click', toggleTheme)
 
-// Set up counter button
-let counter = 100
-const counterButton = document.querySelector<HTMLButtonElement>('#counter')!
-counterButton.addEventListener('click', () => {
-  counter++
-  counterButton.textContent = `Count is ${counter}`
+// Set up counter button listener (delegated)
+document.addEventListener('click', (e) => {
+  const target = e.target as HTMLElement
+  if (target.id === 'counter') {
+    const button = target as HTMLButtonElement
+    const currentCount = parseInt(button.textContent?.match(/\d+/)?.[0] || '0')
+    button.textContent = `Count is ${currentCount + 1}`
+  }
 })
 
 // Listen for system theme changes
@@ -96,3 +116,6 @@ window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e
     updateThemeButton()
   }
 })
+
+// Initial navigation (trigger route rendering)
+window.dispatchEvent(new Event('hashchange'))
