@@ -4,7 +4,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   server: {
     // Listen on all network interfaces (important for Docker)
-    host: '0.0.0.0',
+    host: true,
 
     // Default port
     port: 5173,
