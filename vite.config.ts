@@ -4,7 +4,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   server: {
     // Listen on all network interfaces (important for Docker)
-    host: true,
+    host: '0.0.0.0',
 
     // Default port
     port: 5173,
@@ -14,6 +14,9 @@ export default defineConfig({
 
     // Enable strict port (fail if port is already in use)
     strictPort: true,
+
+    // Allow all hosts (disable host check for dynamic Dokploy subdomains)
+    allowedHosts: ['.etdofresh.com', 'localhost', '127.0.0.1'],
 
     // HMR configuration for reverse proxy and HTTPS
     hmr: {
