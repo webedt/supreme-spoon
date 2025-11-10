@@ -459,6 +459,28 @@ Note that the **application name in Dokploy** (no length limit) may differ from 
 - **Application Name**: `webedt-supreme-spoon-claude-change-background-011cuzsfu8wecbpku6bkfkpj` (full name)
 - **Domain Name**: `supreme-spoon-claude-change-background-011cuzsfu8wecbpku6bkfkpj` (may be shortened)
 
+### Making URLs Clickable in Markdown
+
+When documenting deployment URLs, you can make them clickable in markdown using this format:
+
+```markdown
+[https://your-domain.etdofresh.com](https://your-domain.etdofresh.com)
+```
+
+**Example with your deployment:**
+```markdown
+[https://supreme-spoon-claude-change-background-011cuzsfu8wecbpku6bkfkpj.etdofresh.com](https://supreme-spoon-claude-change-background-011cuzsfu8wecbpku6bkfkpj.etdofresh.com)
+```
+
+This renders as a clickable link: [https://supreme-spoon-claude-change-background-011cuzsfu8wecbpku6bkfkpj.etdofresh.com](https://supreme-spoon-claude-change-background-011cuzsfu8wecbpku6bkfkpj.etdofresh.com)
+
+**Alternative with custom text:**
+```markdown
+[Visit My Deployment](https://supreme-spoon-claude-change-background-011cuzsfu8wecbpku6bkfkpj.etdofresh.com)
+```
+
+This renders as: [Visit My Deployment](https://supreme-spoon-claude-change-background-011cuzsfu8wecbpku6bkfkpj.etdofresh.com)
+
 ### Updating Application Domains
 
 To add or modify domains via API:
