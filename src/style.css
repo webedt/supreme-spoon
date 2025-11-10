@@ -1,5 +1,4 @@
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
@@ -9,6 +8,7 @@
   -moz-osx-font-smoothing: grayscale;
 
   /* Dark theme (default) */
+  --font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   --bg-color: #242424;
   --text-color: rgba(255, 255, 255, 0.87);
   --button-bg: #1a1a1a;
@@ -24,6 +24,7 @@
 
 :root.light {
   /* Light theme */
+  --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   --bg-color: #ffffff;
   --text-color: #213547;
   --button-bg: #f9f9f9;
@@ -39,6 +40,7 @@
 
 :root.blue {
   /* Blue Ocean theme */
+  --font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', sans-serif;
   --bg-color: #0a1929;
   --text-color: #b2bac2;
   --button-bg: #132f4c;
@@ -54,6 +56,7 @@
 
 :root.purple {
   /* Purple Dream theme */
+  --font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
   --bg-color: #1a0a2e;
   --text-color: #d4c5e5;
   --button-bg: #2d1b4e;
@@ -69,6 +72,7 @@
 
 :root.green {
   /* Forest Green theme */
+  --font-family: 'Courier New', Courier, monospace;
   --bg-color: #0d1b0d;
   --text-color: #c5e5c5;
   --button-bg: #1a2e1a;
@@ -84,6 +88,7 @@
 
 :root.sunset {
   /* Sunset Orange theme */
+  --font-family: Georgia, 'Times New Roman', Times, serif;
   --bg-color: #1f1108;
   --text-color: #f5d5b8;
   --button-bg: #331b0a;
@@ -99,6 +104,7 @@
 
 :root.rose {
   /* Rose Pink theme */
+  --font-family: 'Gill Sans', 'Gill Sans MT', Calibri, sans-serif;
   --bg-color: #1f0a14;
   --text-color: #f5c5d8;
   --button-bg: #331525;
@@ -114,6 +120,7 @@
 
 :root.retro {
   /* Retro Gaming theme */
+  --font-family: 'Courier New', 'Lucida Console', Monaco, monospace;
   --bg-color: #0f0f23;
   --text-color: #00ff41;
   --button-bg: #1a1a2e;
@@ -133,7 +140,8 @@ body {
   min-height: 100vh;
   background-color: var(--bg-color);
   color: var(--text-color);
-  transition: background 0.3s ease, color 0.3s ease;
+  font-family: var(--font-family);
+  transition: background 0.3s ease, color 0.3s ease, font-family 0.3s ease;
   overflow: hidden;
 }
 
