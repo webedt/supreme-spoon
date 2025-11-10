@@ -228,16 +228,14 @@ jobs:
               echo "Response: ${GITHUB_BODY}"
             fi
 
-            # Update deployment settings (replicas, placement, and build type)
+            # Update deployment settings (replicas, build type, and registry)
             UPDATE_JSON="{
               \"json\": {
                 \"applicationId\": \"${APP_ID}\",
                 \"replicas\": 1,
-                \"placementSwarm\": {
-                  \"Constraints\": [\"node.role==worker\"]
-                },
                 \"buildType\": \"dockerfile\",
-                \"dockerfile\": \"Dockerfile\"
+                \"dockerfile\": \"Dockerfile\",
+                \"registryUrl\": \"dockerregistry.etdofresh.com\"
               }
             }"
 
@@ -252,7 +250,7 @@ jobs:
             UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
 
             if [ "$UPDATE_HTTP_CODE" -ge 200 ] && [ "$UPDATE_HTTP_CODE" -lt 300 ]; then
-              echo "✅ Deployment settings updated successfully (using Dockerfile)"
+              echo "✅ Deployment settings updated successfully (using Dockerfile with custom registry)"
             else
               echo "⚠️  Warning: Failed to update deployment settings (HTTP ${UPDATE_HTTP_CODE})"
               echo "Response: ${UPDATE_BODY}"
@@ -437,16 +435,14 @@ jobs:
               exit 1
             fi
 
-            # Update deployment settings (replicas, placement, and build type)
+            # Update deployment settings (replicas, build type, and registry)
             UPDATE_JSON="{
               \"json\": {
                 \"applicationId\": \"${APP_ID}\",
                 \"replicas\": 1,
-                \"placementSwarm\": {
-                  \"Constraints\": [\"node.role==worker\"]
-                },
                 \"buildType\": \"dockerfile\",
-                \"dockerfile\": \"Dockerfile\"
+                \"dockerfile\": \"Dockerfile\",
+                \"registryUrl\": \"dockerregistry.etdofresh.com\"
               }
             }"
 
@@ -461,7 +457,7 @@ jobs:
             UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
 
             if [ "$UPDATE_HTTP_CODE" -ge 200 ] && [ "$UPDATE_HTTP_CODE" -lt 300 ]; then
-              echo "✅ Deployment settings updated successfully (using Dockerfile)"
+              echo "✅ Deployment settings updated successfully (using Dockerfile with custom registry)"
             else
               echo "⚠️  Warning: Failed to update deployment settings (HTTP ${UPDATE_HTTP_CODE})"
               echo "Response: ${UPDATE_BODY}"
