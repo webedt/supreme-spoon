@@ -21,8 +21,10 @@ export default defineConfig({
     // HMR configuration for reverse proxy and HTTPS
     hmr: {
       protocol: 'wss',
+      host: undefined, // Let Vite use the current page's hostname
       port: 443,
       clientPort: 443,
+      path: '/vite-hmr', // Custom path for WebSocket
     },
 
     // Watch configuration for file changes
@@ -31,5 +33,8 @@ export default defineConfig({
       usePolling: true,
       interval: 100,
     },
+
+    // Enable CORS for WebSocket connections
+    cors: true,
   },
 })
