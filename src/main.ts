@@ -138,7 +138,8 @@ const themes: ThemeOption[] = [
   { id: 'purple', name: 'Purple Dream', icon: '💜' },
   { id: 'green', name: 'Forest Green', icon: '🌲' },
   { id: 'sunset', name: 'Sunset', icon: '🌅' },
-  { id: 'rose', name: 'Rose Pink', icon: '🌹' }
+  { id: 'rose', name: 'Rose Pink', icon: '🌹' },
+  { id: 'retro', name: 'Retro', icon: '👾' }
 ]
 
 function getStoredTheme(): string | null {

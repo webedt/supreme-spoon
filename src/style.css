@@ -112,6 +112,21 @@
   --border-color: #4a1f2e;
 }
 
+:root.retro {
+  /* Retro Gaming theme */
+  --bg-color: #0f0f23;
+  --text-color: #00ff41;
+  --button-bg: #1a1a2e;
+  --accent-color: #ff10f0;
+  --header-bg: #0a0a1a;
+  --toggle-bg: #2a2a3e;
+  --toggle-hover: #3a3a5e;
+  --sidebar-bg: #0a0a1a;
+  --sidebar-hover: #1a1a2e;
+  --sidebar-active: #ff10f0;
+  --border-color: #00ff41;
+}
+
 body {
   margin: 0;
   min-width: 320px;
@@ -264,6 +279,10 @@ body {
 
 :root.rose .content-wrapper {
   background: linear-gradient(135deg, #1f0a14 0%, #331525 50%, #4d2036 100%);
+}
+
+:root.retro .content-wrapper {
+  background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #2a2a3e 100%);
 }
 
 /* Sidebar Styles */
