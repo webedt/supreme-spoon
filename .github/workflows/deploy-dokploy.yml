@@ -2,14 +2,11 @@ name: Deploy to Dokploy
 
 on:
   push:
-  pull_request:
+  # pull_request:
   workflow_dispatch:
 
-env:
-  NODE_VERSION: '20'
-
 jobs:
-  build-and-deploy:
+  configure-dokploy:
     runs-on: self-hosted
 
     steps:
@@ -18,17 +15,35 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
+      - name: Display Configuration
+        env:
+          DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
+          DOKPLOY_PROJECT_ID: ${{ vars.DOKPLOY_PROJECT_ID }}
+          DOKPLOY_ENVIRONMENT_ID: ${{ vars.DOKPLOY_ENVIRONMENT_ID }}
+          DOKPLOY_GITHUB_ID: ${{ vars.DOKPLOY_GITHUB_ID }}
+          DOKPLOY_SERVER_ID: ${{ vars.DOKPLOY_SERVER_ID }}
+        run: |
+          echo "=========================================="
+          echo "🔧 Deployment Configuration"
+          echo "=========================================="
+          echo ""
+          echo "📦 Repository Information:"
+          echo "  - Repository: ${{ github.repository }}"
+          echo "  - Branch: ${{ github.ref_name }}"
+          echo "  - Commit SHA: ${{ github.sha }}"
+          echo "  - Event: ${{ github.event_name }}"
+          echo ""
+          echo "🔐 Dokploy Configuration:"
+          echo "  - Dokploy URL: ${DOKPLOY_URL}"
+          echo "  - Project ID: ${DOKPLOY_PROJECT_ID}"
+          echo "  - Environment ID: ${DOKPLOY_ENVIRONMENT_ID}"
+          echo "  - GitHub Integration ID: ${DOKPLOY_GITHUB_ID}"
+          echo "  - Server ID: ${DOKPLOY_SERVER_ID}"
+          echo "  - API Key: [MASKED]"
+          echo ""
+          echo "ℹ️  Note: Build will be handled by Dokploy from Dockerfile"
+          echo ""
+          echo "=========================================="
 
       - name: Generate deployment metadata
         id: metadata
@@ -137,127 +152,6 @@ jobs:
           echo "  - App Name (Dokploy): ${APP_NAME} (${#APP_NAME} chars)"
           echo "  - Domain Name: ${DOMAIN_NAME} (${#DOMAIN_NAME} chars, max: ${MAX_LENGTH})"
 
-      - name: Get Docker Registry ID
-        id: registry
-        env:
-          DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
-          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-        run: |
-          # Strip trailing slash from DOKPLOY_URL if present
-          DOKPLOY_URL="${DOKPLOY_URL%/}"
-
-          echo "🔍 Looking for Docker registry 'dockerregistry.etdofresh.com'..."
-
-          # Get all registries
-          REGISTRIES=$(curl -s -X 'GET' \
-            "${DOKPLOY_URL}/api/trpc/registry.all" \
-            -H 'accept: application/json' \
-            -H "x-api-key: ${DOKPLOY_API_KEY}")
-
-          # Debug: Show raw response and parsed registries
-          echo "📋 Registry API Response:"
-          echo "$REGISTRIES" | jq '.' || echo "  (invalid JSON)"
-          echo ""
-          echo "📋 Available registries:"
-          echo "$REGISTRIES" | jq -r '.result.data.json[]? | "  - \(.registryName // "unnamed"): \(.registryUrl)"' || echo "  (none or error parsing)"
-
-          # Try to find registry by URL (case-insensitive search)
-          REGISTRY_DATA=$(echo "$REGISTRIES" | jq -r '.result.data.json[]? | select(.registryUrl | ascii_downcase | contains("dockerregistry.etdofresh.com"))')
-          REGISTRY_ID=$(echo "$REGISTRY_DATA" | jq -r '.registryId')
-          REGISTRY_URL=$(echo "$REGISTRY_DATA" | jq -r '.registryUrl')
-
-          if [ -n "$REGISTRY_ID" ] && [ "$REGISTRY_ID" != "null" ]; then
-            echo "✅ Found Docker registry: ${REGISTRY_ID}"
-            echo "  Current URL: ${REGISTRY_URL}"
-
-            # Check if the URL contains https:// or http:// protocol
-            if echo "$REGISTRY_URL" | grep -qE '^https?://'; then
-              echo "⚠️  Registry URL contains protocol prefix (https:// or http://)"
-              echo "   This will cause Docker image reference errors."
-              echo "   Docker registries should be configured with hostname only."
-              echo ""
-              echo "🔧 Fixing registry URL by removing protocol..."
-
-              # Remove protocol from URL
-              FIXED_URL=$(echo "$REGISTRY_URL" | sed -E 's|^https?://||')
-              echo "  Old URL: ${REGISTRY_URL}"
-              echo "  New URL: ${FIXED_URL}"
-
-              # Get all registry fields for update
-              REGISTRY_NAME=$(echo "$REGISTRY_DATA" | jq -r '.registryName')
-              REGISTRY_USERNAME=$(echo "$REGISTRY_DATA" | jq -r '.username')
-              SELF_HOSTED=$(echo "$REGISTRY_DATA" | jq -r '.selfHosted')
-              IMAGE_PREFIX=$(echo "$REGISTRY_DATA" | jq -r '.imagePrefix')
-
-              # Update the registry with corrected URL
-              UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
-                "${DOKPLOY_URL}/api/trpc/registry.update" \
-                -H 'accept: application/json' \
-                -H 'Content-Type: application/json' \
-                -H "x-api-key: ${DOKPLOY_API_KEY}" \
-                -d "{
-                  \"json\": {
-                    \"registryId\": \"${REGISTRY_ID}\",
-                    \"registryUrl\": \"${FIXED_URL}\",
-                    \"registryName\": \"${REGISTRY_NAME}\",
-                    \"username\": \"${REGISTRY_USERNAME}\",
-                    \"selfHosted\": ${SELF_HOSTED},
-                    \"imagePrefix\": \"${IMAGE_PREFIX}\"
-                  }
-                }")
-
-              UPDATE_HTTP_CODE=$(echo "$UPDATE_RESPONSE" | tail -n1)
-              UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
-
-              if [ "$UPDATE_HTTP_CODE" -ge 200 ] && [ "$UPDATE_HTTP_CODE" -lt 300 ]; then
-                echo "✅ Registry URL updated successfully!"
-                echo "  Response Code: ${UPDATE_HTTP_CODE}"
-              else
-                echo "❌ Failed to update registry URL (HTTP ${UPDATE_HTTP_CODE})"
-                echo "Response: ${UPDATE_BODY}"
-                echo "⚠️  Continuing with original registry configuration..."
-              fi
-            else
-              echo "✅ Registry URL format is correct (no protocol prefix)"
-            fi
-
-            echo "registry_id=${REGISTRY_ID}" >> $GITHUB_OUTPUT
-          else
-            echo "⚠️  Docker registry 'dockerregistry.etdofresh.com' not found"
-            echo "registry_id=" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Login to Docker Registry
-        run: |
-          echo "${{ secrets.DOCKER_REGISTRY_PASSWORD }}" | docker login dockerregistry.etdofresh.com -u "${{ secrets.DOCKER_REGISTRY_USERNAME }}" --password-stdin
-
-      - name: Build and Push Docker Image
-        id: build
-        env:
-          APP_NAME: ${{ steps.metadata.outputs.app_name }}
-          SHORT_SHA: ${{ steps.metadata.outputs.short_sha }}
-        run: |
-          # Build image tag
-          IMAGE_TAG="dockerregistry.etdofresh.com/${APP_NAME}:${SHORT_SHA}"
-          IMAGE_TAG_LATEST="dockerregistry.etdofresh.com/${APP_NAME}:latest"
-
-          echo "🐳 Building Docker image for ARM64 (native build)..."
-          echo "  Image: ${IMAGE_TAG}"
-
-          # Build for ARM64 natively (runner is ARM64)
-          docker buildx build \
-            --tag "${IMAGE_TAG}" \
-            --tag "${IMAGE_TAG_LATEST}" \
-            --push \
-            .
-
-          echo "✅ Image built and pushed successfully"
-          echo "  Tags:"
-          echo "    - ${IMAGE_TAG}"
-          echo "    - ${IMAGE_TAG_LATEST}"
-
-          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
-
       - name: Get or Create Dokploy Application
         id: dokploy_app
         env:
@@ -267,7 +161,7 @@ jobs:
           DOKPLOY_ENVIRONMENT_ID: ${{ vars.DOKPLOY_ENVIRONMENT_ID }}
           DOKPLOY_GITHUB_ID: ${{ vars.DOKPLOY_GITHUB_ID }}
           DOKPLOY_SERVER_ID: ${{ vars.DOKPLOY_SERVER_ID }}
-          DOCKER_REGISTRY_ID: ${{ steps.registry.outputs.registry_id }}
+          # DOKPLOY_REGISTRY_ID: ${{ vars.DOKPLOY_REGISTRY_ID }}
           APP_NAME: ${{ steps.metadata.outputs.app_name }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_BRANCH: ${{ github.ref_name }}
@@ -292,75 +186,56 @@ jobs:
 
           if [ -n "$APP_ID" ] && [ "$APP_ID" != "null" ]; then
             echo "✅ Found existing application: ${APP_ID}"
+            echo "ℹ️  Skipping deployment - deployment only happens on first creation"
+            echo "app_created=false" >> $GITHUB_OUTPUT
 
-            # Configure Docker provider to use pre-built image
-            echo "🐳 Configuring Docker provider for pre-built image..."
+            # Extract repository parts
+            REPO_OWNER="${GITHUB_REPOSITORY%%/*}"
+            REPO_NAME="${GITHUB_REPOSITORY##*/}"
 
-            # Use pre-built Docker image from registry
-            IMAGE_TAG="${{ steps.build.outputs.image_tag }}"
+            # Configure GitHub provider to build from Dockerfile
+            echo "🔗 Configuring GitHub provider to build from Dockerfile..."
+            echo "Repository Details:"
+            echo "  - Full: ${GITHUB_REPOSITORY}"
+            echo "  - Owner: ${REPO_OWNER}"
+            echo "  - Name: ${REPO_NAME}"
+            echo "  - Branch: ${GITHUB_BRANCH}"
+            echo "  - GitHub ID: ${DOKPLOY_GITHUB_ID}"
 
-            # Build JSON payload for Docker provider
-            if [ -n "${DOCKER_REGISTRY_ID}" ]; then
-              # Get registry credentials
-              REGISTRY_INFO=$(curl -s -X 'GET' \
-                "${DOKPLOY_URL}/api/trpc/registry.one?input=%7B%22json%22%3A%7B%22registryId%22%3A%22${DOCKER_REGISTRY_ID}%22%7D%7D" \
-                -H 'accept: application/json' \
-                -H "x-api-key: ${DOKPLOY_API_KEY}")
-
-              REGISTRY_URL=$(echo "$REGISTRY_INFO" | jq -r '.result.data.json.registryUrl')
-              REGISTRY_USERNAME=$(echo "$REGISTRY_INFO" | jq -r '.result.data.json.username')
-              REGISTRY_PASSWORD=$(echo "$REGISTRY_INFO" | jq -r '.result.data.json.password')
-
-              DOCKER_PROVIDER_JSON="{
-                \"json\": {
-                  \"applicationId\": \"${APP_ID}\",
-                  \"dockerImage\": \"${IMAGE_TAG}\",
-                  \"registryUrl\": \"${REGISTRY_URL}\",
-                  \"username\": \"${REGISTRY_USERNAME}\",
-                  \"password\": \"${REGISTRY_PASSWORD}\"
-                }
-              }"
-              echo "  - Deployment: Pre-built Docker Image (ARM64)"
-              echo "  - Image: ${IMAGE_TAG}"
-              echo "  - Using Docker Registry with authentication"
-            else
-              DOCKER_PROVIDER_JSON="{
-                \"json\": {
-                  \"applicationId\": \"${APP_ID}\",
-                  \"dockerImage\": \"${IMAGE_TAG}\"
-                }
-              }"
-              echo "  - Deployment: Pre-built Docker Image (ARM64)"
-              echo "  - Image: ${IMAGE_TAG}"
-              echo "  - No Docker Registry authentication"
-            fi
-
-            # Configure Docker provider (this switches from GitHub to Docker image deployment)
-            DOCKER_PROVIDER_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
-              "${DOKPLOY_URL}/api/trpc/application.saveDockerProvider" \
+            GITHUB_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
+              "${DOKPLOY_URL}/api/trpc/application.saveGithubProvider" \
               -H 'accept: application/json' \
               -H 'Content-Type: application/json' \
               -H "x-api-key: ${DOKPLOY_API_KEY}" \
-              -d "${DOCKER_PROVIDER_JSON}")
+              -d "{
+                \"json\": {
+                  \"applicationId\": \"${APP_ID}\",
+                  \"githubId\": \"${DOKPLOY_GITHUB_ID}\",
+                  \"repository\": \"${REPO_NAME}\",
+                  \"owner\": \"${REPO_OWNER}\",
+                  \"branch\": \"${GITHUB_BRANCH}\",
+                  \"buildPath\": \"/\",
+                  \"enableSubmodules\": false
+                }
+              }")
 
-            DOCKER_PROVIDER_HTTP_CODE=$(echo "$DOCKER_PROVIDER_RESPONSE" | tail -n1)
-            DOCKER_PROVIDER_BODY=$(echo "$DOCKER_PROVIDER_RESPONSE" | sed '$d')
+            GITHUB_HTTP_CODE=$(echo "$GITHUB_RESPONSE" | tail -n1)
+            GITHUB_BODY=$(echo "$GITHUB_RESPONSE" | sed '$d')
 
-            if [ "$DOCKER_PROVIDER_HTTP_CODE" -ge 200 ] && [ "$DOCKER_PROVIDER_HTTP_CODE" -lt 300 ]; then
-              echo "✅ Docker provider configured successfully"
+            if [ "$GITHUB_HTTP_CODE" -ge 200 ] && [ "$GITHUB_HTTP_CODE" -lt 300 ]; then
+              echo "✅ GitHub provider configured successfully"
             else
-              echo "⚠️  Warning: Failed to configure Docker provider (HTTP ${DOCKER_PROVIDER_HTTP_CODE})"
-              echo "Response: ${DOCKER_PROVIDER_BODY}"
+              echo "⚠️  Warning: Failed to configure GitHub provider (HTTP ${GITHUB_HTTP_CODE})"
+              echo "Response: ${GITHUB_BODY}"
             fi
 
-            # Update deployment settings (replicas and placement)
+            # Update deployment settings (replicas, build type)
             UPDATE_JSON="{
               \"json\": {
                 \"applicationId\": \"${APP_ID}\",
                 \"replicas\": 1,
-                \"placementSwarm\": {
-                  \"Constraints\": [\"node.role==worker\"]
-                }
+                \"buildType\": \"dockerfile\",
+                \"dockerfile\": \"Dockerfile\"
               }
             }"
 
@@ -375,118 +250,10 @@ jobs:
             UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
 
             if [ "$UPDATE_HTTP_CODE" -ge 200 ] && [ "$UPDATE_HTTP_CODE" -lt 300 ]; then
-              echo "✅ Docker build configuration updated"
+              echo "✅ Deployment settings updated successfully (using Dockerfile)"
             else
-              echo "⚠️  Warning: Failed to update build configuration (HTTP ${UPDATE_HTTP_CODE})"
+              echo "⚠️  Warning: Failed to update deployment settings (HTTP ${UPDATE_HTTP_CODE})"
               echo "Response: ${UPDATE_BODY}"
-            fi
-
-            # Ensure domain is configured (use DOMAIN_NAME for DNS compliance)
-            DOMAIN_NAME="${{ steps.metadata.outputs.domain_name }}"
-            DOMAIN="${DOMAIN_NAME}.etdofresh.com"
-            echo "🔍 Checking for existing domains..."
-
-            # Get existing domains for this application
-            APP_DETAILS=$(curl -s -X 'POST' \
-              "${DOKPLOY_URL}/api/trpc/application.one" \
-              -H 'accept: application/json' \
-              -H 'Content-Type: application/json' \
-              -H "x-api-key: ${DOKPLOY_API_KEY}" \
-              -d "{
-                \"json\": {
-                  \"applicationId\": \"${APP_ID}\"
-                }
-              }")
-
-            # Get all domains for this application and count duplicates
-            DOMAIN_IDS=$(echo "$APP_DETAILS" | jq -r --arg domain "$DOMAIN" \
-              '.result.data.json.domains[]? | select(.host == $domain) | .domainId')
-
-            DOMAIN_COUNT=$(echo "$DOMAIN_IDS" | grep -c . 2>/dev/null || echo "0")
-
-            echo "Found $DOMAIN_COUNT existing domain(s) for ${DOMAIN}"
-
-            # If there are multiple domains with the same host, remove duplicates (keep the oldest one)
-            if [ "$DOMAIN_COUNT" -gt 1 ]; then
-              echo "⚠️  Found duplicate domains! Cleaning up..."
-
-              # Get all domain details sorted by creation date
-              SORTED_DOMAINS=$(echo "$APP_DETAILS" | jq -r --arg domain "$DOMAIN" \
-                '.result.data.json.domains[]? | select(.host == $domain) |
-                {domainId: .domainId, createdAt: .createdAt} |
-                @json' | sort -t'"' -k4)
-
-              # Keep track of first domain (oldest)
-              FIRST=true
-
-              # Remove duplicate domains (all except the first/oldest)
-              echo "$SORTED_DOMAINS" | while read -r domain_json; do
-                DUPLICATE_ID=$(echo "$domain_json" | jq -r '.domainId')
-                CREATED_AT=$(echo "$domain_json" | jq -r '.createdAt')
-
-                if [ "$FIRST" = true ]; then
-                  echo "  ✅ Keeping oldest domain: ${DUPLICATE_ID} (created ${CREATED_AT})"
-                  FIRST=false
-                else
-                  echo "  🗑️  Removing duplicate: ${DUPLICATE_ID} (created ${CREATED_AT})"
-                  DELETE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
-                    "${DOKPLOY_URL}/api/trpc/domain.delete" \
-                    -H 'accept: application/json' \
-                    -H 'Content-Type: application/json' \
-                    -H "x-api-key: ${DOKPLOY_API_KEY}" \
-                    -d "{
-                      \"json\": {
-                        \"domainId\": \"${DUPLICATE_ID}\"
-                      }
-                    }")
-
-                  DELETE_HTTP_CODE=$(echo "$DELETE_RESPONSE" | tail -n1)
-                  if [ "$DELETE_HTTP_CODE" -ge 200 ] && [ "$DELETE_HTTP_CODE" -lt 300 ]; then
-                    echo "    ✅ Deleted successfully"
-                  else
-                    echo "    ⚠️  Failed to delete (HTTP ${DELETE_HTTP_CODE})"
-                  fi
-                fi
-              done
-
-              echo "✅ Duplicate cleanup complete"
-              DOMAIN_EXISTS="true"
-            elif [ "$DOMAIN_COUNT" -eq 1 ]; then
-              echo "ℹ️  Domain already exists: https://${DOMAIN}"
-              DOMAIN_EXISTS="true"
-            else
-              DOMAIN_EXISTS="false"
-            fi
-
-            # Only create domain if it doesn't exist
-            if [ "$DOMAIN_EXISTS" = "false" ]; then
-              echo "📝 Creating domain: https://${DOMAIN}"
-              DOMAIN_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
-                "${DOKPLOY_URL}/api/trpc/domain.create" \
-                -H 'accept: application/json' \
-                -H 'Content-Type: application/json' \
-                -H "x-api-key: ${DOKPLOY_API_KEY}" \
-                -d "{
-                  \"json\": {
-                    \"applicationId\": \"${APP_ID}\",
-                    \"host\": \"${DOMAIN}\",
-                    \"path\": \"/\",
-                    \"port\": 5173,
-                    \"https\": true,
-                    \"certificateType\": \"letsencrypt\",
-                    \"domainType\": \"application\"
-                  }
-                }")
-
-              DOMAIN_HTTP_CODE=$(echo "$DOMAIN_RESPONSE" | tail -n1)
-
-              if [ "$DOMAIN_HTTP_CODE" -ge 200 ] && [ "$DOMAIN_HTTP_CODE" -lt 300 ]; then
-                echo "✅ Domain created successfully: https://${DOMAIN}"
-              else
-                echo "⚠️  Warning: Failed to create domain (HTTP ${DOMAIN_HTTP_CODE})"
-                DOMAIN_BODY=$(echo "$DOMAIN_RESPONSE" | sed '$d')
-                echo "Response: ${DOMAIN_BODY}"
-              fi
             fi
           else
             echo "📦 Application not found. Creating new application..."
@@ -523,6 +290,7 @@ jobs:
             if [ "$CREATE_HTTP_CODE" -ge 200 ] && [ "$CREATE_HTTP_CODE" -lt 300 ]; then
               APP_ID=$(echo "$CREATE_BODY" | jq -r '.result.data.json.applicationId // .result.data.applicationId // .applicationId')
               echo "✅ Application created successfully: ${APP_ID}"
+              echo "app_created=true" >> $GITHUB_OUTPUT
             else
               echo "❌ Failed to create application (HTTP ${CREATE_HTTP_CODE})"
               echo "Response: ${CREATE_BODY}"
@@ -559,75 +327,13 @@ jobs:
               exit 1
             fi
 
-            # Configure Docker provider to use pre-built image
-            echo "🐳 Configuring Docker provider for pre-built image..."
-
-            # Use pre-built Docker image from registry
-            IMAGE_TAG="${{ steps.build.outputs.image_tag }}"
-
-            # Build JSON payload for Docker provider
-            if [ -n "${DOCKER_REGISTRY_ID}" ]; then
-              # Get registry credentials
-              REGISTRY_INFO=$(curl -s -X 'GET' \
-                "${DOKPLOY_URL}/api/trpc/registry.one?input=%7B%22json%22%3A%7B%22registryId%22%3A%22${DOCKER_REGISTRY_ID}%22%7D%7D" \
-                -H 'accept: application/json' \
-                -H "x-api-key: ${DOKPLOY_API_KEY}")
-
-              REGISTRY_URL=$(echo "$REGISTRY_INFO" | jq -r '.result.data.json.registryUrl')
-              REGISTRY_USERNAME=$(echo "$REGISTRY_INFO" | jq -r '.result.data.json.username')
-              REGISTRY_PASSWORD=$(echo "$REGISTRY_INFO" | jq -r '.result.data.json.password')
-
-              DOCKER_PROVIDER_JSON="{
-                \"json\": {
-                  \"applicationId\": \"${APP_ID}\",
-                  \"dockerImage\": \"${IMAGE_TAG}\",
-                  \"registryUrl\": \"${REGISTRY_URL}\",
-                  \"username\": \"${REGISTRY_USERNAME}\",
-                  \"password\": \"${REGISTRY_PASSWORD}\"
-                }
-              }"
-              echo "  - Deployment: Pre-built Docker Image (ARM64)"
-              echo "  - Image: ${IMAGE_TAG}"
-              echo "  - Using Docker Registry with authentication"
-            else
-              DOCKER_PROVIDER_JSON="{
-                \"json\": {
-                  \"applicationId\": \"${APP_ID}\",
-                  \"dockerImage\": \"${IMAGE_TAG}\"
-                }
-              }"
-              echo "  - Deployment: Pre-built Docker Image (ARM64)"
-              echo "  - Image: ${IMAGE_TAG}"
-              echo "  - No Docker Registry authentication"
-            fi
-
-            # Configure Docker provider (this switches from GitHub to Docker image deployment)
-            DOCKER_PROVIDER_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
-              "${DOKPLOY_URL}/api/trpc/application.saveDockerProvider" \
-              -H 'accept: application/json' \
-              -H 'Content-Type: application/json' \
-              -H "x-api-key: ${DOKPLOY_API_KEY}" \
-              -d "${DOCKER_PROVIDER_JSON}")
-
-            DOCKER_PROVIDER_HTTP_CODE=$(echo "$DOCKER_PROVIDER_RESPONSE" | tail -n1)
-            DOCKER_PROVIDER_BODY=$(echo "$DOCKER_PROVIDER_RESPONSE" | sed '$d')
-
-            if [ "$DOCKER_PROVIDER_HTTP_CODE" -ge 200 ] && [ "$DOCKER_PROVIDER_HTTP_CODE" -lt 300 ]; then
-              echo "✅ Docker provider configured successfully"
-            else
-              echo "❌ Failed to configure Docker provider (HTTP ${DOCKER_PROVIDER_HTTP_CODE})"
-              echo "Response: ${DOCKER_PROVIDER_BODY}"
-              exit 1
-            fi
-
-            # Update deployment settings (replicas and placement)
+            # Update deployment settings (replicas, build type)
             UPDATE_JSON="{
               \"json\": {
                 \"applicationId\": \"${APP_ID}\",
                 \"replicas\": 1,
-                \"placementSwarm\": {
-                  \"Constraints\": [\"node.role==worker\"]
-                }
+                \"buildType\": \"dockerfile\",
+                \"dockerfile\": \"Dockerfile\"
               }
             }"
 
@@ -642,7 +348,7 @@ jobs:
             UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
 
             if [ "$UPDATE_HTTP_CODE" -ge 200 ] && [ "$UPDATE_HTTP_CODE" -lt 300 ]; then
-              echo "✅ Deployment settings updated successfully"
+              echo "✅ Deployment settings updated successfully (using Dockerfile)"
             else
               echo "⚠️  Warning: Failed to update deployment settings (HTTP ${UPDATE_HTTP_CODE})"
               echo "Response: ${UPDATE_BODY}"
@@ -669,7 +375,7 @@ jobs:
             DOMAIN_IDS=$(echo "$APP_DETAILS" | jq -r --arg domain "$DOMAIN" \
               '.result.data.json.domains[]? | select(.host == $domain) | .domainId')
 
-            DOMAIN_COUNT=$(echo "$DOMAIN_IDS" | grep -c . 2>/dev/null || echo "0")
+            DOMAIN_COUNT=$(echo "$DOMAIN_IDS" | grep -c . 2>/dev/null | tr -d '\n' || echo "0")
 
             echo "Found $DOMAIN_COUNT existing domain(s) for ${DOMAIN}"
 
@@ -771,6 +477,7 @@ jobs:
 
 
       - name: Deploy to Dokploy
+        if: steps.dokploy_app.outputs.app_created == 'true'
         env:
           DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
@@ -779,31 +486,6 @@ jobs:
         run: |
           # Strip trailing slash from DOKPLOY_URL if present
           DOKPLOY_URL="${DOKPLOY_URL%/}"
-
-          echo "🛑 Stopping application ${APP_NAME} to ensure clean restart..."
-
-          # Stop the application first to ensure fresh deployment
-          STOP_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
-            "${DOKPLOY_URL}/api/trpc/application.stop" \
-            -H 'accept: application/json' \
-            -H 'Content-Type: application/json' \
-            -H "x-api-key: ${DOKPLOY_API_KEY}" \
-            -d "{
-              \"json\": {
-                \"applicationId\": \"${APPLICATION_ID}\"
-              }
-            }")
-
-          STOP_HTTP_CODE=$(echo "$STOP_RESPONSE" | tail -n1)
-
-          if [ "$STOP_HTTP_CODE" -ge 200 ] && [ "$STOP_HTTP_CODE" -lt 300 ]; then
-            echo "✅ Application stopped successfully"
-          else
-            echo "ℹ️  Application may not be running (HTTP ${STOP_HTTP_CODE}), proceeding with deployment"
-          fi
-
-          # Wait a moment for the stop to complete
-          sleep 2
 
           echo "🚀 Deploying ${APP_NAME} to Dokploy..."
 
