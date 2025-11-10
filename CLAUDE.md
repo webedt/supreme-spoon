@@ -474,13 +474,6 @@ When documenting deployment URLs, you can make them clickable in markdown using 
 
 This renders as a clickable link: [https://supreme-spoon-claude-change-background-011cuzsfu8wecbpku6bkfkpj.etdofresh.com](https://supreme-spoon-claude-change-background-011cuzsfu8wecbpku6bkfkpj.etdofresh.com)
 
-**Alternative with custom text:**
-```markdown
-[Visit My Deployment](https://supreme-spoon-claude-change-background-011cuzsfu8wecbpku6bkfkpj.etdofresh.com)
-```
-
-This renders as: [Visit My Deployment](https://supreme-spoon-claude-change-background-011cuzsfu8wecbpku6bkfkpj.etdofresh.com)
-
 ### Updating Application Domains
 
 To add or modify domains via API:
