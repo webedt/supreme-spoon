@@ -1,5 +1,88 @@
 import './style.css'
 
+// Session management types and storage
+interface Session {
+  id: string
+  name: string
+  request: string
+  repo: string
+  environment: string
+  output: string
+  createdAt: string
+  updatedAt: string
+}
+
+const SESSIONS_KEY = 'sessions'
+const CURRENT_SESSION_KEY = 'currentSession'
+
+function getSessions(): Session[] {
+  const stored = localStorage.getItem(SESSIONS_KEY)
+  return stored ? JSON.parse(stored) : []
+}
+
+function saveSessions(sessions: Session[]): void {
+  localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions))
+}
+
+function getCurrentSession(): Session | null {
+  const sessionId = localStorage.getItem(CURRENT_SESSION_KEY)
+  if (!sessionId) return null
+  const sessions = getSessions()
+  return sessions.find(s => s.id === sessionId) || null
+}
+
+function setCurrentSession(sessionId: string | null): void {
+  if (sessionId) {
+    localStorage.setItem(CURRENT_SESSION_KEY, sessionId)
+  } else {
+    localStorage.removeItem(CURRENT_SESSION_KEY)
+  }
+}
+
+function createSession(request: string, repo: string, environment: string, output: string): Session {
+  const session: Session = {
+    id: generateSessionId(),
+    name: `Session ${new Date().toLocaleString()}`,
+    request,
+    repo,
+    environment,
+    output,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }
+
+  const sessions = getSessions()
+  sessions.unshift(session) // Add to beginning
+  saveSessions(sessions)
+  setCurrentSession(session.id)
+
+  return session
+}
+
+function updateSession(sessionId: string, updates: Partial<Session>): void {
+  const sessions = getSessions()
+  const index = sessions.findIndex(s => s.id === sessionId)
+  if (index !== -1) {
+    sessions[index] = {
+      ...sessions[index],
+      ...updates,
+      updatedAt: new Date().toISOString()
+    }
+    saveSessions(sessions)
+  }
+}
+
+function deleteSession(sessionId: string): void {
+  const sessions = getSessions()
+  const filtered = sessions.filter(s => s.id !== sessionId)
+  saveSessions(filtered)
+
+  // If we deleted the current session, clear it
+  if (getCurrentSession()?.id === sessionId) {
+    setCurrentSession(null)
+  }
+}
+
 // Theme management
 const THEME_KEY = 'theme'
 const THEME_LIGHT = 'light'
@@ -81,58 +164,78 @@ const pages: Page[] = [
     id: 'sessions',
     title: 'Sessions',
     icon: '🚀',
-    render: () => `
-      <div class="page-content">
-        <h1>Create New Session</h1>
-        <p class="message">
-          Submit a request to create a new session with your selected repository and environment.
-        </p>
-        <div class="card">
-          <form id="session-form">
-            <div class="form-group">
-              <label class="form-label" for="request">Your Request</label>
-              <textarea
-                id="request"
-                class="form-textarea"
-                placeholder="Describe what you want to build or accomplish..."
-                required
-              ></textarea>
-            </div>
+    render: () => {
+      const sessions = getSessions()
+      const currentSession = getCurrentSession()
 
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label" for="github-repo">GitHub Repository</label>
-                <select id="github-repo" class="form-select" required>
-                  <option value="">Select a repository...</option>
-                  <option value="webedt/supreme-spoon">webedt/supreme-spoon</option>
-                  <option value="webedt/example-app">webedt/example-app</option>
-                  <option value="webedt/demo-project">webedt/demo-project</option>
-                  <option value="webedt/starter-template">webedt/starter-template</option>
-                </select>
-              </div>
+      return `
+        <div class="page-content">
+          <h1>Sessions</h1>
+          <p class="message">
+            Create and manage your development sessions with different repositories and environments.
+          </p>
 
-              <div class="form-group">
-                <label class="form-label" for="environment">Environment</label>
-                <select id="environment" class="form-select" required>
-                  <option value="">Select an environment...</option>
-                  <option value="production">Production</option>
-                  <option value="staging">Staging</option>
-                  <option value="development">Development</option>
-                  <option value="testing">Testing</option>
-                </select>
+          <div class="sessions-container">
+            <!-- Sessions Sidebar -->
+            <div class="sessions-sidebar">
+              <button id="new-session-btn" class="new-session-btn">+ New Session</button>
+              <div class="sessions-sidebar-header">Recent Sessions</div>
+              <div class="sessions-list" id="sessions-list">
+                ${sessions.length === 0 ? '<div class="empty-state">No sessions yet. Create one to get started!</div>' : ''}
               </div>
             </div>
 
-            <button type="submit" class="submit-button">Create Session</button>
-          </form>
+            <!-- Main Content Area -->
+            <div class="sessions-main">
+              <div class="card">
+                <form id="session-form">
+                  <div class="form-group">
+                    <label class="form-label" for="request">Your Request</label>
+                    <textarea
+                      id="request"
+                      class="form-textarea"
+                      placeholder="Describe what you want to build or accomplish..."
+                      required
+                    >${currentSession?.request || ''}</textarea>
+                  </div>
 
-          <div id="session-output" class="output-container hidden">
-            <div class="output-header">Session Output</div>
-            <div id="output-content" class="output-content"></div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label" for="github-repo">GitHub Repository</label>
+                      <select id="github-repo" class="form-select" required>
+                        <option value="">Select a repository...</option>
+                        <option value="webedt/supreme-spoon" ${currentSession?.repo === 'webedt/supreme-spoon' ? 'selected' : ''}>webedt/supreme-spoon</option>
+                        <option value="webedt/example-app" ${currentSession?.repo === 'webedt/example-app' ? 'selected' : ''}>webedt/example-app</option>
+                        <option value="webedt/demo-project" ${currentSession?.repo === 'webedt/demo-project' ? 'selected' : ''}>webedt/demo-project</option>
+                        <option value="webedt/starter-template" ${currentSession?.repo === 'webedt/starter-template' ? 'selected' : ''}>webedt/starter-template</option>
+                      </select>
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" for="environment">Environment</label>
+                      <select id="environment" class="form-select" required>
+                        <option value="">Select an environment...</option>
+                        <option value="production" ${currentSession?.environment === 'production' ? 'selected' : ''}>Production</option>
+                        <option value="staging" ${currentSession?.environment === 'staging' ? 'selected' : ''}>Staging</option>
+                        <option value="development" ${currentSession?.environment === 'development' ? 'selected' : ''}>Development</option>
+                        <option value="testing" ${currentSession?.environment === 'testing' ? 'selected' : ''}>Testing</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <button type="submit" class="submit-button">${currentSession ? 'Update Session' : 'Create Session'}</button>
+                </form>
+
+                <div id="session-output" class="output-container ${currentSession?.output ? '' : 'hidden'}">
+                  <div class="output-header">Session Output</div>
+                  <div id="output-content" class="output-content">${currentSession?.output || ''}</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    `
+      `
+    }
   },
   {
     id: 'about',
@@ -222,6 +325,19 @@ function attachPageEventListeners(pageId: string): void {
 
   // Attach form listener for sessions page
   if (pageId === 'sessions') {
+    // Render the sessions list
+    renderSessionsList()
+
+    // New session button
+    const newSessionBtn = document.querySelector<HTMLButtonElement>('#new-session-btn')
+    if (newSessionBtn) {
+      newSessionBtn.addEventListener('click', () => {
+        setCurrentSession(null)
+        renderPage('sessions')
+      })
+    }
+
+    // Session form
     const form = document.querySelector<HTMLFormElement>('#session-form')
     if (form) {
       form.addEventListener('submit', (e) => {
@@ -276,16 +392,30 @@ ${selectedPhrases.join('\n')}
 Session ID: ${generateSessionId()}
         `.trim()
 
-        // Display output
+        // Check if we're updating an existing session or creating a new one
+        const currentSession = getCurrentSession()
+        if (currentSession) {
+          // Update existing session
+          updateSession(currentSession.id, {
+            request,
+            repo,
+            environment,
+            output: outputText
+          })
+        } else {
+          // Create new session
+          createSession(request, repo, environment, outputText)
+        }
+
+        // Re-render the page to show updated session
+        renderPage('sessions')
+
+        // Scroll to output
         const outputContainer = document.querySelector<HTMLDivElement>('#session-output')
-        const outputContent = document.querySelector<HTMLDivElement>('#output-content')
-
-        if (outputContainer && outputContent) {
-          outputContent.textContent = outputText
-          outputContainer.classList.remove('hidden')
-
-          // Scroll to output
-          outputContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        if (outputContainer) {
+          setTimeout(() => {
+            outputContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+          }, 100)
         }
       })
     }
@@ -300,6 +430,108 @@ function generateSessionId(): string {
     id += chars.charAt(Math.floor(Math.random() * chars.length))
   }
   return id
+}
+
+// Render sessions list in the sidebar
+function renderSessionsList(): void {
+  const listContainer = document.querySelector('#sessions-list')
+  if (!listContainer) return
+
+  const sessions = getSessions()
+  const currentSession = getCurrentSession()
+
+  if (sessions.length === 0) {
+    listContainer.innerHTML = '<div class="empty-state">No sessions yet. Create one to get started!</div>'
+    return
+  }
+
+  listContainer.innerHTML = sessions.map(session => {
+    const date = new Date(session.createdAt)
+    const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const isActive = currentSession?.id === session.id
+
+    return `
+      <div class="session-item ${isActive ? 'active' : ''}" data-session-id="${session.id}">
+        <div class="session-item-header">
+          <div class="session-item-name" data-editable="false">${session.name}</div>
+          <div class="session-item-actions">
+            <button class="session-action-btn edit-session" data-session-id="${session.id}" title="Rename">✏️</button>
+            <button class="session-action-btn delete-session" data-session-id="${session.id}" title="Delete">🗑️</button>
+          </div>
+        </div>
+        <div class="session-item-meta">
+          <span class="session-item-date">${formattedDate}</span>
+          <span class="session-item-env">${session.environment}</span>
+        </div>
+      </div>
+    `
+  }).join('')
+
+  // Attach click listeners to session items
+  listContainer.querySelectorAll('.session-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement
+      // Don't trigger if clicking on action buttons
+      if (target.closest('.session-action-btn')) return
+
+      const sessionId = item.getAttribute('data-session-id')
+      if (sessionId) {
+        setCurrentSession(sessionId)
+        renderPage('sessions')
+      }
+    })
+  })
+
+  // Attach edit listeners
+  listContainer.querySelectorAll('.edit-session').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      const sessionId = btn.getAttribute('data-session-id')
+      if (sessionId) {
+        const sessionItem = btn.closest('.session-item')
+        const nameElement = sessionItem?.querySelector('.session-item-name')
+        if (nameElement) {
+          const currentName = nameElement.textContent || ''
+          nameElement.innerHTML = `<input type="text" class="session-item-name-input" value="${currentName}" />`
+          const input = nameElement.querySelector('input')
+          if (input) {
+            input.focus()
+            input.select()
+
+            const saveEdit = () => {
+              const newName = input.value.trim()
+              if (newName && newName !== currentName) {
+                updateSession(sessionId, { name: newName })
+              }
+              renderSessionsList()
+            }
+
+            input.addEventListener('blur', saveEdit)
+            input.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                saveEdit()
+              } else if (e.key === 'Escape') {
+                renderSessionsList()
+              }
+            })
+          }
+        }
+      }
+    })
+  })
+
+  // Attach delete listeners
+  listContainer.querySelectorAll('.delete-session').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      const sessionId = btn.getAttribute('data-session-id')
+      if (sessionId && confirm('Are you sure you want to delete this session?')) {
+        deleteSession(sessionId)
+        renderPage('sessions')
+      }
+    })
+  })
 }
 
 // Sidebar state management
