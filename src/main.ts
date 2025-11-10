@@ -1,6 +1,6 @@
 import './style.css'
 
-// Session management types and storage
+// Session management types and API integration
 interface Session {
   id: string
   name: string
@@ -8,27 +8,41 @@ interface Session {
   repo: string
   environment: string
   output: string
-  createdAt: string
-  updatedAt: string
+  created_at?: string
+  updated_at?: string
+  createdAt?: string  // For backwards compatibility
+  updatedAt?: string   // For backwards compatibility
 }
 
-const SESSIONS_KEY = 'sessions'
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:3000')
 const CURRENT_SESSION_KEY = 'currentSession'
 
-function getSessions(): Session[] {
-  const stored = localStorage.getItem(SESSIONS_KEY)
-  return stored ? JSON.parse(stored) : []
-}
+// Cache for sessions to avoid excessive API calls
+let sessionsCache: Session[] | null = null
 
-function saveSessions(sessions: Session[]): void {
-  localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions))
+async function getSessions(): Promise<Session[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/sessions`)
+    if (!response.ok) throw new Error('Failed to fetch sessions')
+    const sessions = await response.json()
+    sessionsCache = sessions
+    return sessions
+  } catch (error) {
+    console.error('Error fetching sessions:', error)
+    return sessionsCache || []
+  }
 }
 
 function getCurrentSession(): Session | null {
   const sessionId = localStorage.getItem(CURRENT_SESSION_KEY)
   if (!sessionId) return null
-  const sessions = getSessions()
-  return sessions.find(s => s.id === sessionId) || null
+
+  // Try to find in cache
+  if (sessionsCache) {
+    return sessionsCache.find(s => s.id === sessionId) || null
+  }
+
+  return null
 }
 
 function setCurrentSession(sessionId: string | null): void {
@@ -39,7 +53,7 @@ function setCurrentSession(sessionId: string | null): void {
   }
 }
 
-function createSession(request: string, repo: string, environment: string, output: string): Session {
+async function createSession(request: string, repo: string, environment: string, output: string): Promise<Session> {
   const session: Session = {
     id: generateSessionId(),
     name: `Session ${new Date().toLocaleString()}`,
@@ -47,39 +61,64 @@ function createSession(request: string, repo: string, environment: string, outpu
     repo,
     environment,
     output,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   }
 
-  const sessions = getSessions()
-  sessions.unshift(session) // Add to beginning
-  saveSessions(sessions)
-  setCurrentSession(session.id)
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(session)
+    })
 
-  return session
+    if (!response.ok) throw new Error('Failed to create session')
+
+    const createdSession = await response.json()
+    sessionsCache = null // Invalidate cache
+    setCurrentSession(createdSession.id)
+
+    return createdSession
+  } catch (error) {
+    console.error('Error creating session:', error)
+    throw error
+  }
 }
 
-function updateSession(sessionId: string, updates: Partial<Session>): void {
-  const sessions = getSessions()
-  const index = sessions.findIndex(s => s.id === sessionId)
-  if (index !== -1) {
-    sessions[index] = {
-      ...sessions[index],
-      ...updates,
-      updatedAt: new Date().toISOString()
+async function updateSession(sessionId: string, updates: Partial<Session>): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    })
+
+    if (!response.ok) throw new Error('Failed to update session')
+
+    sessionsCache = null // Invalidate cache
+  } catch (error) {
+    console.error('Error updating session:', error)
+    throw error
+  }
+}
+
+async function deleteSession(sessionId: string): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
+      method: 'DELETE'
+    })
+
+    if (!response.ok) throw new Error('Failed to delete session')
+
+    sessionsCache = null // Invalidate cache
+
+    // If we deleted the current session, clear it
+    if (getCurrentSession()?.id === sessionId) {
+      setCurrentSession(null)
     }
-    saveSessions(sessions)
-  }
-}
-
-function deleteSession(sessionId: string): void {
-  const sessions = getSessions()
-  const filtered = sessions.filter(s => s.id !== sessionId)
-  saveSessions(filtered)
-
-  // If we deleted the current session, clear it
-  if (getCurrentSession()?.id === sessionId) {
-    setCurrentSession(null)
+  } catch (error) {
+    console.error('Error deleting session:', error)
+    throw error
   }
 }
 
@@ -165,7 +204,6 @@ const pages: Page[] = [
     title: 'Sessions',
     icon: '🚀',
     render: () => {
-      const sessions = getSessions()
       const currentSession = getCurrentSession()
 
       return `
@@ -181,7 +219,7 @@ const pages: Page[] = [
               <button id="new-session-btn" class="new-session-btn">+ New Session</button>
               <div class="sessions-sidebar-header">Recent Sessions</div>
               <div class="sessions-list" id="sessions-list">
-                ${sessions.length === 0 ? '<div class="empty-state">No sessions yet. Create one to get started!</div>' : ''}
+                <div class="empty-state">Loading sessions...</div>
               </div>
             </div>
 
@@ -340,7 +378,7 @@ function attachPageEventListeners(pageId: string): void {
     // Session form
     const form = document.querySelector<HTMLFormElement>('#session-form')
     if (form) {
-      form.addEventListener('submit', (e) => {
+      form.addEventListener('submit', async (e) => {
         e.preventDefault()
 
         // Get form values
@@ -392,30 +430,35 @@ ${selectedPhrases.join('\n')}
 Session ID: ${generateSessionId()}
         `.trim()
 
-        // Check if we're updating an existing session or creating a new one
-        const currentSession = getCurrentSession()
-        if (currentSession) {
-          // Update existing session
-          updateSession(currentSession.id, {
-            request,
-            repo,
-            environment,
-            output: outputText
-          })
-        } else {
-          // Create new session
-          createSession(request, repo, environment, outputText)
-        }
+        try {
+          // Check if we're updating an existing session or creating a new one
+          const currentSession = getCurrentSession()
+          if (currentSession) {
+            // Update existing session
+            await updateSession(currentSession.id, {
+              request,
+              repo,
+              environment,
+              output: outputText
+            })
+          } else {
+            // Create new session
+            await createSession(request, repo, environment, outputText)
+          }
 
-        // Re-render the page to show updated session
-        renderPage('sessions')
+          // Re-render the page to show updated session
+          renderPage('sessions')
 
-        // Scroll to output
-        const outputContainer = document.querySelector<HTMLDivElement>('#session-output')
-        if (outputContainer) {
-          setTimeout(() => {
-            outputContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-          }, 100)
+          // Scroll to output
+          const outputContainer = document.querySelector<HTMLDivElement>('#session-output')
+          if (outputContainer) {
+            setTimeout(() => {
+              outputContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+            }, 100)
+          }
+        } catch (error) {
+          console.error('Error saving session:', error)
+          alert('Failed to save session. Please try again.')
         }
       })
     }
@@ -433,11 +476,11 @@ function generateSessionId(): string {
 }
 
 // Render sessions list in the sidebar
-function renderSessionsList(): void {
+async function renderSessionsList(): Promise<void> {
   const listContainer = document.querySelector('#sessions-list')
   if (!listContainer) return
 
-  const sessions = getSessions()
+  const sessions = await getSessions()
   const currentSession = getCurrentSession()
 
   if (sessions.length === 0) {
@@ -446,7 +489,8 @@ function renderSessionsList(): void {
   }
 
   listContainer.innerHTML = sessions.map(session => {
-    const date = new Date(session.createdAt)
+    const dateStr = session.created_at || session.createdAt || new Date().toISOString()
+    const date = new Date(dateStr)
     const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const isActive = currentSession?.id === session.id
 
@@ -498,15 +542,15 @@ function renderSessionsList(): void {
             input.focus()
             input.select()
 
-            const saveEdit = () => {
+            const saveEdit = async () => {
               const newName = input.value.trim()
               if (newName && newName !== currentName) {
-                updateSession(sessionId, { name: newName })
+                await updateSession(sessionId, { name: newName })
               }
-              renderSessionsList()
+              await renderSessionsList()
             }
 
-            input.addEventListener('blur', saveEdit)
+            input.addEventListener('blur', () => saveEdit())
             input.addEventListener('keydown', (e) => {
               if (e.key === 'Enter') {
                 e.preventDefault()
@@ -523,11 +567,11 @@ function renderSessionsList(): void {
 
   // Attach delete listeners
   listContainer.querySelectorAll('.delete-session').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('click', async (e) => {
       e.stopPropagation()
       const sessionId = btn.getAttribute('data-session-id')
       if (sessionId && confirm('Are you sure you want to delete this session?')) {
-        deleteSession(sessionId)
+        await deleteSession(sessionId)
         renderPage('sessions')
       }
     })
