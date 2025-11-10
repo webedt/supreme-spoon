@@ -15,13 +15,10 @@ export default defineConfig({
     // Enable strict port (fail if port is already in use)
     strictPort: true,
 
-    // Allow all hosts (important for Dokploy dynamic subdomains)
-    allowedHosts: ['.etdofresh.com'],
-
-    // HMR configuration for reverse proxy
-    // Don't set host - Vite will use the current page's hostname
+    // HMR configuration for reverse proxy and HTTPS
     hmr: {
       protocol: 'wss',
+      port: 443,
       clientPort: 443,
     },
 
