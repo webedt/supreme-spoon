@@ -253,12 +253,6 @@ document.querySelectorAll('.nav-item').forEach(item => {
     const pageId = item.getAttribute('data-page')
     if (pageId) {
       navigateToPage(pageId)
-
-      // On mobile, close sidebar after navigation
-      const sidebar = document.querySelector('.sidebar')
-      if (sidebar && window.innerWidth <= 768) {
-        toggleSidebar()
-      }
     }
   })
 })
