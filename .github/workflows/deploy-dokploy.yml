@@ -228,14 +228,16 @@ jobs:
               echo "Response: ${GITHUB_BODY}"
             fi
 
-            # Update deployment settings (replicas and placement)
+            # Update deployment settings (replicas, placement, and build type)
             UPDATE_JSON="{
               \"json\": {
                 \"applicationId\": \"${APP_ID}\",
                 \"replicas\": 1,
                 \"placementSwarm\": {
                   \"Constraints\": [\"node.role==worker\"]
-                }
+                },
+                \"buildType\": \"dockerfile\",
+                \"dockerfile\": \"Dockerfile\"
               }
             }"
 
@@ -250,7 +252,7 @@ jobs:
             UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
 
             if [ "$UPDATE_HTTP_CODE" -ge 200 ] && [ "$UPDATE_HTTP_CODE" -lt 300 ]; then
-              echo "✅ Deployment settings updated successfully"
+              echo "✅ Deployment settings updated successfully (using Dockerfile)"
             else
               echo "⚠️  Warning: Failed to update deployment settings (HTTP ${UPDATE_HTTP_CODE})"
               echo "Response: ${UPDATE_BODY}"
@@ -435,14 +437,16 @@ jobs:
               exit 1
             fi
 
-            # Update deployment settings (replicas and placement)
+            # Update deployment settings (replicas, placement, and build type)
             UPDATE_JSON="{
               \"json\": {
                 \"applicationId\": \"${APP_ID}\",
                 \"replicas\": 1,
                 \"placementSwarm\": {
                   \"Constraints\": [\"node.role==worker\"]
-                }
+                },
+                \"buildType\": \"dockerfile\",
+                \"dockerfile\": \"Dockerfile\"
               }
             }"
 
@@ -457,7 +461,7 @@ jobs:
             UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
 
             if [ "$UPDATE_HTTP_CODE" -ge 200 ] && [ "$UPDATE_HTTP_CODE" -lt 300 ]; then
-              echo "✅ Deployment settings updated successfully"
+              echo "✅ Deployment settings updated successfully (using Dockerfile)"
             else
               echo "⚠️  Warning: Failed to update deployment settings (HTTP ${UPDATE_HTTP_CODE})"
               echo "Response: ${UPDATE_BODY}"
