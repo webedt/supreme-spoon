@@ -78,6 +78,63 @@ const pages: Page[] = [
     `
   },
   {
+    id: 'sessions',
+    title: 'Sessions',
+    icon: '🚀',
+    render: () => `
+      <div class="page-content">
+        <h1>Create New Session</h1>
+        <p class="message">
+          Submit a request to create a new session with your selected repository and environment.
+        </p>
+        <div class="card">
+          <form id="session-form">
+            <div class="form-group">
+              <label class="form-label" for="request">Your Request</label>
+              <textarea
+                id="request"
+                class="form-textarea"
+                placeholder="Describe what you want to build or accomplish..."
+                required
+              ></textarea>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="github-repo">GitHub Repository</label>
+                <select id="github-repo" class="form-select" required>
+                  <option value="">Select a repository...</option>
+                  <option value="webedt/supreme-spoon">webedt/supreme-spoon</option>
+                  <option value="webedt/example-app">webedt/example-app</option>
+                  <option value="webedt/demo-project">webedt/demo-project</option>
+                  <option value="webedt/starter-template">webedt/starter-template</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="environment">Environment</label>
+                <select id="environment" class="form-select" required>
+                  <option value="">Select an environment...</option>
+                  <option value="production">Production</option>
+                  <option value="staging">Staging</option>
+                  <option value="development">Development</option>
+                  <option value="testing">Testing</option>
+                </select>
+              </div>
+            </div>
+
+            <button type="submit" class="submit-button">Create Session</button>
+          </form>
+
+          <div id="session-output" class="output-container hidden">
+            <div class="output-header">Session Output</div>
+            <div id="output-content" class="output-content"></div>
+          </div>
+        </div>
+      </div>
+    `
+  },
+  {
     id: 'about',
     title: 'About',
     icon: 'ℹ️',
@@ -162,6 +219,87 @@ function attachPageEventListeners(pageId: string): void {
       })
     }
   }
+
+  // Attach form listener for sessions page
+  if (pageId === 'sessions') {
+    const form = document.querySelector<HTMLFormElement>('#session-form')
+    if (form) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault()
+
+        // Get form values
+        const request = (document.querySelector<HTMLTextAreaElement>('#request'))?.value || ''
+        const repo = (document.querySelector<HTMLSelectElement>('#github-repo'))?.value || ''
+        const environment = (document.querySelector<HTMLSelectElement>('#environment'))?.value || ''
+
+        // Generate mock output with random phrases
+        const mockPhrases = [
+          'Initializing session workspace...',
+          'Connecting to GitHub repository...',
+          'Setting up environment configuration...',
+          'Installing dependencies...',
+          'Running build scripts...',
+          'Configuring deployment settings...',
+          'Starting development server...',
+          'Generating session credentials...',
+          'Allocating compute resources...',
+          'Establishing secure connection...',
+          'Session created successfully!',
+          'Your workspace is ready to use.',
+          'Navigate to the dashboard to view details.',
+        ]
+
+        // Randomly select 5-8 phrases
+        const numPhrases = Math.floor(Math.random() * 4) + 5
+        const selectedPhrases: string[] = []
+        const usedIndices = new Set<number>()
+
+        while (selectedPhrases.length < numPhrases) {
+          const index = Math.floor(Math.random() * mockPhrases.length)
+          if (!usedIndices.has(index)) {
+            usedIndices.add(index)
+            selectedPhrases.push(mockPhrases[index])
+          }
+        }
+
+        // Build output text
+        const outputText = `
+Request: ${request}
+
+Repository: ${repo}
+Environment: ${environment}
+
+Processing...
+
+${selectedPhrases.join('\n')}
+
+Session ID: ${generateSessionId()}
+        `.trim()
+
+        // Display output
+        const outputContainer = document.querySelector<HTMLDivElement>('#session-output')
+        const outputContent = document.querySelector<HTMLDivElement>('#output-content')
+
+        if (outputContainer && outputContent) {
+          outputContent.textContent = outputText
+          outputContainer.classList.remove('hidden')
+
+          // Scroll to output
+          outputContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        }
+      })
+    }
+  }
+}
+
+// Helper function to generate a random session ID
+function generateSessionId(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  let id = ''
+  for (let i = 0; i < 12; i++) {
+    id += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return id
 }
 
 // Sidebar state management
