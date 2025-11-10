@@ -19,10 +19,10 @@ export default defineConfig({
     allowedHosts: ['.etdofresh.com', 'localhost', '127.0.0.1'],
 
     // HMR configuration for hot reloading
+    // Use client port for WebSocket connection through reverse proxy
     hmr: {
-      protocol: 'ws',
-      host: 'localhost',
-      port: 5173,
+      clientPort: 443, // Connect through HTTPS port
+      protocol: 'wss', // Use secure WebSocket for HTTPS
     },
 
     // Watch configuration for file changes (still useful for detecting changes)
