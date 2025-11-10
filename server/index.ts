@@ -183,9 +183,13 @@ app.get('/health', (req: Request, res: Response) => {
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static('dist'))
-  app.get('*', (req: Request, res: Response) => {
-    if (!req.path.startsWith('/api')) {
+
+  // Catch-all route for SPA - must be last
+  app.use((req: Request, res: Response, next) => {
+    if (!req.path.startsWith('/api') && !req.path.includes('.')) {
       res.sendFile('index.html', { root: 'dist' })
+    } else {
+      next()
     }
   })
 }
