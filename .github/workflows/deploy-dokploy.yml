@@ -202,6 +202,8 @@ jobs:
 
           if [ -n "$APP_ID" ] && [ "$APP_ID" != "null" ]; then
             echo "✅ Found existing application: ${APP_ID}"
+            echo "ℹ️  Skipping deployment - deployment only happens on first creation"
+            echo "app_created=false" >> $GITHUB_OUTPUT
 
             # Extract repository parts
             REPO_OWNER="${GITHUB_REPOSITORY%%/*}"
@@ -413,6 +415,7 @@ jobs:
             if [ "$CREATE_HTTP_CODE" -ge 200 ] && [ "$CREATE_HTTP_CODE" -lt 300 ]; then
               APP_ID=$(echo "$CREATE_BODY" | jq -r '.result.data.json.applicationId // .result.data.applicationId // .applicationId')
               echo "✅ Application created successfully: ${APP_ID}"
+              echo "app_created=true" >> $GITHUB_OUTPUT
             else
               echo "❌ Failed to create application (HTTP ${CREATE_HTTP_CODE})"
               echo "Response: ${CREATE_BODY}"
@@ -600,6 +603,7 @@ jobs:
 
 
       - name: Deploy to Dokploy
+        if: steps.dokploy_app.outputs.app_created == 'true'
         env:
           DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
