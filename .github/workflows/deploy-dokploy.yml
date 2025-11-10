@@ -30,6 +30,38 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Display Configuration
+        env:
+          DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
+          DOKPLOY_PROJECT_ID: ${{ vars.DOKPLOY_PROJECT_ID }}
+          DOKPLOY_ENVIRONMENT_ID: ${{ vars.DOKPLOY_ENVIRONMENT_ID }}
+          DOKPLOY_GITHUB_ID: ${{ vars.DOKPLOY_GITHUB_ID }}
+          DOKPLOY_SERVER_ID: ${{ vars.DOKPLOY_SERVER_ID }}
+        run: |
+          echo "=========================================="
+          echo "🔧 Deployment Configuration"
+          echo "=========================================="
+          echo ""
+          echo "📦 Repository Information:"
+          echo "  - Repository: ${{ github.repository }}"
+          echo "  - Branch: ${{ github.ref_name }}"
+          echo "  - Commit SHA: ${{ github.sha }}"
+          echo "  - Event: ${{ github.event_name }}"
+          echo ""
+          echo "🔐 Dokploy Configuration:"
+          echo "  - Dokploy URL: ${DOKPLOY_URL}"
+          echo "  - Project ID: ${DOKPLOY_PROJECT_ID}"
+          echo "  - Environment ID: ${DOKPLOY_ENVIRONMENT_ID}"
+          echo "  - GitHub Integration ID: ${DOKPLOY_GITHUB_ID}"
+          echo "  - Server ID: ${DOKPLOY_SERVER_ID}"
+          echo "  - API Key: [MASKED]"
+          echo ""
+          echo "🛠️  Build Configuration:"
+          echo "  - Node Version: ${{ env.NODE_VERSION }}"
+          echo "  - Runner: ${{ runner.os }} ${{ runner.arch }}"
+          echo ""
+          echo "=========================================="
+
       - name: Generate deployment metadata
         id: metadata
         run: |
