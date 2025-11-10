@@ -161,6 +161,7 @@ jobs:
           DOKPLOY_ENVIRONMENT_ID: ${{ vars.DOKPLOY_ENVIRONMENT_ID }}
           DOKPLOY_GITHUB_ID: ${{ vars.DOKPLOY_GITHUB_ID }}
           DOKPLOY_SERVER_ID: ${{ vars.DOKPLOY_SERVER_ID }}
+          DOKPLOY_REGISTRY_ID: ${{ vars.DOKPLOY_REGISTRY_ID }}
           APP_NAME: ${{ steps.metadata.outputs.app_name }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_BRANCH: ${{ github.ref_name }}
@@ -235,7 +236,7 @@ jobs:
                 \"replicas\": 1,
                 \"buildType\": \"dockerfile\",
                 \"dockerfile\": \"Dockerfile\",
-                \"registryUrl\": \"dockerregistry.etdofresh.com\"
+                \"registryId\": \"${DOKPLOY_REGISTRY_ID}\"
               }
             }"
 
@@ -250,118 +251,10 @@ jobs:
             UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
 
             if [ "$UPDATE_HTTP_CODE" -ge 200 ] && [ "$UPDATE_HTTP_CODE" -lt 300 ]; then
-              echo "✅ Deployment settings updated successfully (using Dockerfile with custom registry)"
+              echo "✅ Deployment settings updated successfully (using Dockerfile with custom registry: ${DOKPLOY_REGISTRY_ID})"
             else
               echo "⚠️  Warning: Failed to update deployment settings (HTTP ${UPDATE_HTTP_CODE})"
               echo "Response: ${UPDATE_BODY}"
-            fi
-
-            # Ensure domain is configured (use DOMAIN_NAME for DNS compliance)
-            DOMAIN_NAME="${{ steps.metadata.outputs.domain_name }}"
-            DOMAIN="${DOMAIN_NAME}.etdofresh.com"
-            echo "🔍 Checking for existing domains..."
-
-            # Get existing domains for this application
-            APP_DETAILS=$(curl -s -X 'POST' \
-              "${DOKPLOY_URL}/api/trpc/application.one" \
-              -H 'accept: application/json' \
-              -H 'Content-Type: application/json' \
-              -H "x-api-key: ${DOKPLOY_API_KEY}" \
-              -d "{
-                \"json\": {
-                  \"applicationId\": \"${APP_ID}\"
-                }
-              }")
-
-            # Get all domains for this application and count duplicates
-            DOMAIN_IDS=$(echo "$APP_DETAILS" | jq -r --arg domain "$DOMAIN" \
-              '.result.data.json.domains[]? | select(.host == $domain) | .domainId')
-
-            DOMAIN_COUNT=$(echo "$DOMAIN_IDS" | grep -c . 2>/dev/null | tr -d '\n' || echo "0")
-
-            echo "Found $DOMAIN_COUNT existing domain(s) for ${DOMAIN}"
-
-            # If there are multiple domains with the same host, remove duplicates (keep the oldest one)
-            if [ "$DOMAIN_COUNT" -gt 1 ]; then
-              echo "⚠️  Found duplicate domains! Cleaning up..."
-
-              # Get all domain details sorted by creation date
-              SORTED_DOMAINS=$(echo "$APP_DETAILS" | jq -r --arg domain "$DOMAIN" \
-                '.result.data.json.domains[]? | select(.host == $domain) |
-                {domainId: .domainId, createdAt: .createdAt} |
-                @json' | sort -t'"' -k4)
-
-              # Keep track of first domain (oldest)
-              FIRST=true
-
-              # Remove duplicate domains (all except the first/oldest)
-              echo "$SORTED_DOMAINS" | while read -r domain_json; do
-                DUPLICATE_ID=$(echo "$domain_json" | jq -r '.domainId')
-                CREATED_AT=$(echo "$domain_json" | jq -r '.createdAt')
-
-                if [ "$FIRST" = true ]; then
-                  echo "  ✅ Keeping oldest domain: ${DUPLICATE_ID} (created ${CREATED_AT})"
-                  FIRST=false
-                else
-                  echo "  🗑️  Removing duplicate: ${DUPLICATE_ID} (created ${CREATED_AT})"
-                  DELETE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
-                    "${DOKPLOY_URL}/api/trpc/domain.delete" \
-                    -H 'accept: application/json' \
-                    -H 'Content-Type: application/json' \
-                    -H "x-api-key: ${DOKPLOY_API_KEY}" \
-                    -d "{
-                      \"json\": {
-                        \"domainId\": \"${DUPLICATE_ID}\"
-                      }
-                    }")
-
-                  DELETE_HTTP_CODE=$(echo "$DELETE_RESPONSE" | tail -n1)
-                  if [ "$DELETE_HTTP_CODE" -ge 200 ] && [ "$DELETE_HTTP_CODE" -lt 300 ]; then
-                    echo "    ✅ Deleted successfully"
-                  else
-                    echo "    ⚠️  Failed to delete (HTTP ${DELETE_HTTP_CODE})"
-                  fi
-                fi
-              done
-
-              echo "✅ Duplicate cleanup complete"
-              DOMAIN_EXISTS="true"
-            elif [ "$DOMAIN_COUNT" -eq 1 ]; then
-              echo "ℹ️  Domain already exists: https://${DOMAIN}"
-              DOMAIN_EXISTS="true"
-            else
-              DOMAIN_EXISTS="false"
-            fi
-
-            # Only create domain if it doesn't exist
-            if [ "$DOMAIN_EXISTS" = "false" ]; then
-              echo "📝 Creating domain: https://${DOMAIN}"
-              DOMAIN_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
-                "${DOKPLOY_URL}/api/trpc/domain.create" \
-                -H 'accept: application/json' \
-                -H 'Content-Type: application/json' \
-                -H "x-api-key: ${DOKPLOY_API_KEY}" \
-                -d "{
-                  \"json\": {
-                    \"applicationId\": \"${APP_ID}\",
-                    \"host\": \"${DOMAIN}\",
-                    \"path\": \"/\",
-                    \"port\": 5173,
-                    \"https\": true,
-                    \"certificateType\": \"letsencrypt\",
-                    \"domainType\": \"application\"
-                  }
-                }")
-
-              DOMAIN_HTTP_CODE=$(echo "$DOMAIN_RESPONSE" | tail -n1)
-
-              if [ "$DOMAIN_HTTP_CODE" -ge 200 ] && [ "$DOMAIN_HTTP_CODE" -lt 300 ]; then
-                echo "✅ Domain created successfully: https://${DOMAIN}"
-              else
-                echo "⚠️  Warning: Failed to create domain (HTTP ${DOMAIN_HTTP_CODE})"
-                DOMAIN_BODY=$(echo "$DOMAIN_RESPONSE" | sed '$d')
-                echo "Response: ${DOMAIN_BODY}"
-              fi
             fi
           else
             echo "📦 Application not found. Creating new application..."
@@ -442,7 +335,7 @@ jobs:
                 \"replicas\": 1,
                 \"buildType\": \"dockerfile\",
                 \"dockerfile\": \"Dockerfile\",
-                \"registryUrl\": \"dockerregistry.etdofresh.com\"
+                \"registryId\": \"${DOKPLOY_REGISTRY_ID}\"
               }
             }"
 
@@ -457,7 +350,7 @@ jobs:
             UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
 
             if [ "$UPDATE_HTTP_CODE" -ge 200 ] && [ "$UPDATE_HTTP_CODE" -lt 300 ]; then
-              echo "✅ Deployment settings updated successfully (using Dockerfile with custom registry)"
+              echo "✅ Deployment settings updated successfully (using Dockerfile with custom registry: ${DOKPLOY_REGISTRY_ID})"
             else
               echo "⚠️  Warning: Failed to update deployment settings (HTTP ${UPDATE_HTTP_CODE})"
               echo "Response: ${UPDATE_BODY}"
@@ -595,31 +488,6 @@ jobs:
         run: |
           # Strip trailing slash from DOKPLOY_URL if present
           DOKPLOY_URL="${DOKPLOY_URL%/}"
-
-          echo "🛑 Stopping application ${APP_NAME} to ensure clean restart..."
-
-          # Stop the application first to ensure fresh deployment
-          STOP_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
-            "${DOKPLOY_URL}/api/trpc/application.stop" \
-            -H 'accept: application/json' \
-            -H 'Content-Type: application/json' \
-            -H "x-api-key: ${DOKPLOY_API_KEY}" \
-            -d "{
-              \"json\": {
-                \"applicationId\": \"${APPLICATION_ID}\"
-              }
-            }")
-
-          STOP_HTTP_CODE=$(echo "$STOP_RESPONSE" | tail -n1)
-
-          if [ "$STOP_HTTP_CODE" -ge 200 ] && [ "$STOP_HTTP_CODE" -lt 300 ]; then
-            echo "✅ Application stopped successfully"
-          else
-            echo "ℹ️  Application may not be running (HTTP ${STOP_HTTP_CODE}), proceeding with deployment"
-          fi
-
-          # Wait a moment for the stop to complete
-          sleep 2
 
           echo "🚀 Deploying ${APP_NAME} to Dokploy..."
 
