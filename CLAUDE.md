@@ -438,6 +438,21 @@ curl -X 'POST' \
   }' | jq '.result.data.json.domains'
 ```
 
+#### Method 4: Using the Deployment URL Script (For Claude)
+
+**IMPORTANT FOR CLAUDE:** When you need to provide the deployment URL to the user, always use the `scripts/get-deployment-url.sh` script to calculate the accurate URL. This script implements the exact same naming logic as the GitHub Actions workflow.
+
+```bash
+./scripts/get-deployment-url.sh
+```
+
+The script will output:
+- Repository information (owner, repo, branch)
+- Which naming strategy was used
+- The accurate deployment URL
+
+**Always run this script and provide the user with the deployment URL it generates.** This ensures accuracy and consistency with the actual deployed application URL.
+
 ### Domain Name Length Constraints
 
 DNS subdomains have a 63-character limit. The workflow uses a progressive fallback strategy:
