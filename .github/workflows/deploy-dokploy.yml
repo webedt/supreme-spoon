@@ -444,7 +444,7 @@ jobs:
                     \"applicationId\": \"${APP_ID}\",
                     \"host\": \"${DOMAIN}\",
                     \"path\": \"/\",
-                    \"port\": 3000,
+                    \"port\": 5173,
                     \"https\": true,
                     \"certificateType\": \"letsencrypt\",
                     \"domainType\": \"application\"
@@ -472,7 +472,8 @@ jobs:
           echo "  - ID: ${APP_ID}"
           echo "  - Name: ${APP_NAME}"
           echo "  - Domain: https://${DOMAIN_NAME}.etdofresh.com"
-          echo "  - Port: 3000 (Express Server)"
+          echo "  - Port: 5173 (Vite Dev Server with HMR)"
+          echo "  - Backend: 3000 (Express API Server)"
           echo "  - Environment: ${DOKPLOY_ENVIRONMENT_ID}"
 
 
