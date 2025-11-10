@@ -13,6 +13,13 @@
 - Display the URL as a clickable markdown link
 - Remind the user that the deployment will be live once the GitHub Actions workflow completes
 
+- **ALWAYS** also display a link to the GitHub repository with the current branch
+  - GitHub repository link format: `https://github.com/{owner}/{repo}/tree/{branch}`
+  - Owner: `webedt`
+  - Repository: `supreme-spoon`
+  - Example: `https://github.com/webedt/supreme-spoon/tree/claude/rename-to-example-application-011CV15wcRN9L6Qhz35QN5qZ`
+- Display the GitHub link as a clickable markdown link
+
 ## Overview
 
 Dokploy provides a comprehensive REST API for managing applications, databases, and deployments programmatically. The API is particularly useful for CI/CD pipelines, automation scripts, and custom integrations.
