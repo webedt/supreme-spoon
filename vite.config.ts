@@ -15,21 +15,22 @@ export default defineConfig({
     // Enable strict port (fail if port is already in use)
     strictPort: true,
 
-    // Allow all hosts (important for Dokploy dynamic subdomains)
-    allowedHosts: ['.etdofresh.com'],
+    // Allow all hosts (disable host check for dynamic Dokploy subdomains)
+    allowedHosts: ['.etdofresh.com', 'localhost', '127.0.0.1'],
 
-    // HMR configuration for reverse proxy
-    // Don't set host - Vite will use the current page's hostname
-    hmr: {
-      protocol: 'wss',
-      clientPort: 443,
-    },
+    // HMR configuration - disabled for production deployment
+    // HMR over reverse proxy with HTTPS requires WebSocket upgrade support
+    // which may not be configured in Dokploy. Manual refresh still works.
+    hmr: false,
 
-    // Watch configuration for file changes
+    // Watch configuration for file changes (still useful for detecting changes)
     watch: {
       // Poll for changes (useful in Docker volumes on some systems)
       usePolling: true,
       interval: 100,
     },
+
+    // Enable CORS
+    cors: true,
   },
 })
