@@ -33,7 +33,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: linear-gradient(135deg, #0a1a2e 0%, #1a2d4d 25%, #16304e 75%, #0f3a60 100%);
+  background: linear-gradient(135deg, #050f1a 0%, #0a1a2e 25%, #0d1f3a 75%, #0a1530 100%);
   color: var(--text-color);
   transition: background 0.3s ease, color 0.3s ease;
 }
