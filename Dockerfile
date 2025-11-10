@@ -1,4 +1,4 @@
-# Production build with backend server
+# Development build with hot reloading
 FROM node:20
 
 WORKDIR /app
@@ -6,20 +6,18 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci
+# Install all dependencies (including dev dependencies)
+RUN npm install
 
 # Copy source code
 COPY . .
 
-# Build frontend
-RUN npm run build
-
-# Expose backend API port
+# Expose backend API port and Vite dev server port
 EXPOSE 3000
+EXPOSE 5173
 
-# Set environment to production
-ENV NODE_ENV=production
+# Set environment to development
+ENV NODE_ENV=development
 
-# Start backend server (serves API and static frontend files)
-CMD ["npm", "run", "start"]
+# Start in dev mode with hot reloading (both backend and frontend)
+CMD ["npm", "run", "dev"]

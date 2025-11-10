@@ -18,10 +18,12 @@ export default defineConfig({
     // Allow all hosts (disable host check for dynamic Dokploy subdomains)
     allowedHosts: ['.etdofresh.com', 'localhost', '127.0.0.1'],
 
-    // HMR configuration - disabled for production deployment
-    // HMR over reverse proxy with HTTPS requires WebSocket upgrade support
-    // which may not be configured in Dokploy. Manual refresh still works.
-    hmr: false,
+    // HMR configuration for hot reloading
+    // Use client port for WebSocket connection through reverse proxy
+    hmr: {
+      clientPort: 443, // Connect through HTTPS port
+      protocol: 'wss', // Use secure WebSocket for HTTPS
+    },
 
     // Watch configuration for file changes (still useful for detecting changes)
     watch: {
@@ -32,5 +34,14 @@ export default defineConfig({
 
     // Enable CORS
     cors: true,
+
+    // Proxy API requests to backend
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
 })
