@@ -107,9 +107,10 @@ interface Session {
 }
 
 // API Routes
+// Note: Routes don't include /api prefix because reverse proxy handles that
 
 // Get all sessions
-app.get('/api/sessions', async (req: Request, res: Response) => {
+app.get('/sessions', async (req: Request, res: Response) => {
   try {
     if (dbAvailable && pool) {
       const result = await pool.query(
@@ -135,7 +136,7 @@ app.get('/api/sessions', async (req: Request, res: Response) => {
 })
 
 // Get a single session by ID
-app.get('/api/sessions/:id', async (req: Request, res: Response) => {
+app.get('/sessions/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params
 
@@ -167,7 +168,7 @@ app.get('/api/sessions/:id', async (req: Request, res: Response) => {
 })
 
 // Create a new session
-app.post('/api/sessions', async (req: Request, res: Response) => {
+app.post('/sessions', async (req: Request, res: Response) => {
   try {
     const { id, name, request, repo, environment, output } = req.body as Session
 
@@ -221,7 +222,7 @@ app.post('/api/sessions', async (req: Request, res: Response) => {
 })
 
 // Update a session
-app.put('/api/sessions/:id', async (req: Request, res: Response) => {
+app.put('/sessions/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params
     const { name, request, repo, environment, output } = req.body
@@ -306,7 +307,7 @@ app.put('/api/sessions/:id', async (req: Request, res: Response) => {
 })
 
 // Delete a session
-app.delete('/api/sessions/:id', async (req: Request, res: Response) => {
+app.delete('/sessions/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params
 
@@ -369,7 +370,8 @@ async function start() {
   // Start listening immediately (don't wait for database)
   app.listen(PORT, () => {
     console.log(`✅ Backend API server running on port ${PORT}`)
-    console.log(`📡 API available at http://localhost:${PORT}/api/sessions`)
+    console.log(`📡 Routes: /sessions, /sessions/:id, /health`)
+    console.log(`📡 (accessed via reverse proxy at /api/sessions)`)
     console.log(`💾 Storage mode: ${dbAvailable ? 'PostgreSQL' : 'In-Memory (temporary)'}`)
 
     if (!dbAvailable) {
