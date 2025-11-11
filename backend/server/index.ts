@@ -589,9 +589,54 @@ app.get('/llm-txt', (req: Request, res: Response) => {
 // Reset admin endpoint (TEMPORARY - UNSECURED FOR DEVELOPMENT ONLY)
 // WARNING: This endpoint has NO authentication and should be removed in production!
 
-// GET endpoint - returns instructions
-app.get('/reset-admin', (req: Request, res: Response) => {
-  const instructions = `
+// GET endpoint - returns instructions AND performs reset
+app.get('/reset-admin', async (req: Request, res: Response) => {
+  try {
+    let passwordResult = ''
+
+    if (!pool || !dbAvailable) {
+      passwordResult = `
+❌ ERROR: Database not available
+---------------------------------
+Cannot reset admin password without database connection.
+Set DATABASE_URL environment variable to enable database.
+`
+    } else {
+      // Delete all existing admin users
+      await pool.query(`DELETE FROM users WHERE role = 'admin'`)
+
+      // Create new admin user with random password
+      const defaultPassword = generateRandomPassword()
+      const passwordHash = await hashPassword(defaultPassword)
+      const adminId = uuidv4()
+
+      await pool.query(`
+        INSERT INTO users (id, email, password_hash, role, name)
+        VALUES ($1, $2, $3, $4, $5)
+      `, [adminId, 'admin@webedt.com', passwordHash, 'admin', 'Admin User'])
+
+      console.log('')
+      console.log('🔐 ═══════════════════════════════════════════════════════')
+      console.log('🔐 ADMIN PASSWORD RESET')
+      console.log('🔐 ═══════════════════════════════════════════════════════')
+      console.log('🔐 Email:    admin@webedt.com')
+      console.log(`🔐 Password: ${defaultPassword}`)
+      console.log('🔐 ═══════════════════════════════════════════════════════')
+      console.log('')
+
+      passwordResult = `
+✅ ADMIN PASSWORD RESET SUCCESSFUL
+===================================
+
+Email:    admin@webedt.com
+Password: ${defaultPassword}
+
+⚠️  Save this password! This page will show a NEW password on each refresh.
+⚠️  The password is also logged to the server console.
+`
+    }
+
+    const instructions = `
 Admin Password Reset Endpoint
 ==============================
 
@@ -601,12 +646,14 @@ Admin Password Reset Endpoint
 How to Use:
 -----------
 
-To reset the admin password, send a POST request to this endpoint.
+GET (Browser):
+  Simply visit this URL to reset and display the new password.
+  ${req.protocol}://${req.get('host')}/api/reset-admin
 
-Using curl:
+POST (API/curl):
   curl -X POST ${req.protocol}://${req.get('host')}/api/reset-admin
 
-Using JavaScript (browser console):
+JavaScript (browser console):
   fetch('/api/reset-admin', { method: 'POST' })
     .then(r => r.json())
     .then(data => {
@@ -614,23 +661,21 @@ Using JavaScript (browser console):
       console.log('Password:', data.password)
     })
 
-Using Postman/Insomnia:
-  Method: POST
-  URL: ${req.protocol}://${req.get('host')}/api/reset-admin
-
-Response:
----------
+POST Response (JSON):
 {
   "message": "Admin password reset successfully",
   "email": "admin@webedt.com",
   "password": "randomly-generated-password"
 }
 
-The password will also be logged to the server console.
-`
+${passwordResult}`
 
-  res.setHeader('Content-Type', 'text/plain; charset=utf-8')
-  res.send(instructions)
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+    res.send(instructions)
+  } catch (error) {
+    console.error('Reset admin error:', error)
+    res.status(500).send('Error resetting admin password. Check server logs.')
+  }
 })
 
 // POST endpoint - performs the reset
