@@ -16,9 +16,10 @@ import { homePage, attachHomeListeners } from './pages/home'
 import { sessionsPage, attachSessionsListeners } from './pages/sessions'
 import { aboutPage, attachAboutListeners } from './pages/about'
 import { settingsPage, attachSettingsListeners } from './pages/settings'
+import { llmTxtPage, attachLlmTxtListeners } from './pages/llm-txt'
 
 // Define all pages
-const pages = [homePage, sessionsPage, aboutPage, settingsPage]
+const pages = [homePage, sessionsPage, aboutPage, settingsPage, llmTxtPage]
 
 /**
  * Render a page by ID
@@ -62,6 +63,9 @@ function attachPageEventListeners(pageId: string): void {
       break
     case 'settings':
       attachSettingsListeners()
+      break
+    case 'llm-txt':
+      attachLlmTxtListeners()
       break
   }
 }

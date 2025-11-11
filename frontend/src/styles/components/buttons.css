@@ -171,3 +171,28 @@ button:disabled:hover {
 .session-item.active .session-action-btn:hover {
   background-color: rgba(255, 255, 255, 0.2);
 }
+
+/* Raw Button (for llm.txt page) */
+.raw-button {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-size: 0.95rem;
+  font-weight: 600;
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  box-shadow: var(--shadow-md);
+  width: auto;
+}
+
+.raw-button:hover {
+  background-color: var(--accent-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.raw-button:active {
+  transform: translateY(0);
+}

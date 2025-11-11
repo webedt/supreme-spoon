@@ -701,6 +701,27 @@ button:focus-visible {
   transform: none;
 }
 
+.raw-button {
+  padding: 0.5rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.25s, transform 0.1s;
+}
+
+.raw-button:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.raw-button:active {
+  transform: translateY(0);
+}
+
 .output-container {
   margin-top: 2rem;
   padding: 1.5rem;
