@@ -160,6 +160,9 @@ async function createDefaultAdmin() {
 // In-memory session storage fallback
 const inMemorySessions: Map<string, Session> = new Map()
 
+// In-memory user storage fallback
+const inMemoryUsers: Map<string, any> = new Map()
+
 // Session interface
 interface Session {
   id: string
@@ -170,6 +173,45 @@ interface Session {
   output: string
   created_at?: string
   updated_at?: string
+}
+
+// Create in-memory admin user
+async function createInMemoryAdmin() {
+  // Check if admin already exists
+  const hasAdmin = Array.from(inMemoryUsers.values()).some(u => u.role === 'admin')
+
+  if (!hasAdmin) {
+    const defaultPassword = generateRandomPassword()
+    const passwordHash = await hashPassword(defaultPassword)
+    const adminId = uuidv4()
+    const now = new Date().toISOString()
+
+    const adminUser = {
+      id: adminId,
+      email: 'admin@example.com',
+      password_hash: passwordHash,
+      role: 'admin',
+      name: 'Admin User',
+      created_at: now,
+      updated_at: now
+    }
+
+    inMemoryUsers.set(adminId, adminUser)
+    // Also index by email for easy lookup
+    inMemoryUsers.set(`email:${adminUser.email}`, adminUser)
+
+    console.log('')
+    console.log('🔐 ═══════════════════════════════════════════════════════')
+    console.log('🔐 IN-MEMORY ADMIN USER CREATED')
+    console.log('🔐 ═══════════════════════════════════════════════════════')
+    console.log('🔐 Email:    admin@example.com')
+    console.log(`🔐 Password: ${defaultPassword}`)
+    console.log('🔐 ═══════════════════════════════════════════════════════')
+    console.log('🔐 ⚠️  IMPORTANT: This is temporary and will be lost on restart!')
+    console.log('🔐 ⚠️  Set DATABASE_URL for persistent user storage')
+    console.log('🔐 ═══════════════════════════════════════════════════════')
+    console.log('')
+  }
 }
 
 // API Routes
@@ -571,12 +613,17 @@ async function start() {
     })
   }
 
+  // Create in-memory admin user if database is not available
+  if (!dbAvailable) {
+    await createInMemoryAdmin()
+  }
+
   // Mount auth routes (after pool initialization)
-  const authRoutes = createAuthRoutes(pool, dbAvailable)
+  const authRoutes = createAuthRoutes(pool, dbAvailable, inMemoryUsers)
   app.use('/auth', authRoutes)
 
   // Mount user management routes (admin only)
-  const userRoutes = createUserRoutes(pool, dbAvailable)
+  const userRoutes = createUserRoutes(pool, dbAvailable, inMemoryUsers)
   app.use('/users', userRoutes)
 
   // Start listening immediately (don't wait for database)

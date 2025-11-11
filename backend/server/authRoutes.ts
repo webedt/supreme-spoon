@@ -11,30 +11,34 @@ import {
   type UserRole
 } from './auth.js'
 
-export function createAuthRoutes(pool: Pool | null, dbAvailable: boolean) {
+export function createAuthRoutes(pool: Pool | null, dbAvailable: boolean, inMemoryUsers: Map<string, any>) {
   const router = Router()
 
   // Login endpoint
   router.post('/login', async (req: Request, res: Response) => {
     try {
-      if (!pool || !dbAvailable) {
-        return res.status(503).json({ error: 'Database not available' })
-      }
-
       const { email, password } = req.body
 
       if (!email || !password) {
         return res.status(400).json({ error: 'Email and password are required' })
       }
 
-      // Find user by email
-      const result = await pool.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase()])
+      let user: any = null
 
-      if (result.rows.length === 0) {
-        return res.status(401).json({ error: 'Invalid email or password' })
+      if (dbAvailable && pool) {
+        // Use database
+        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase()])
+        if (result.rows.length > 0) {
+          user = result.rows[0]
+        }
+      } else {
+        // Use in-memory storage
+        user = inMemoryUsers.get(`email:${email.toLowerCase()}`)
       }
 
-      const user = result.rows[0]
+      if (!user) {
+        return res.status(401).json({ error: 'Invalid email or password' })
+      }
 
       // Check password
       const isValidPassword = await comparePassword(password, user.password_hash)
@@ -70,22 +74,38 @@ export function createAuthRoutes(pool: Pool | null, dbAvailable: boolean) {
   // Get current user info (requires authentication)
   router.get('/me', authenticateToken, async (req: Request, res: Response) => {
     try {
-      if (!pool || !dbAvailable) {
-        return res.status(503).json({ error: 'Database not available' })
-      }
-
       if (!req.user) {
         return res.status(401).json({ error: 'Not authenticated' })
       }
 
-      // Get full user data from database
-      const result = await pool.query('SELECT id, email, role, name, created_at, updated_at FROM users WHERE id = $1', [req.user.userId])
+      let user: any = null
 
-      if (result.rows.length === 0) {
+      if (dbAvailable && pool) {
+        // Get from database
+        const result = await pool.query('SELECT id, email, role, name, created_at, updated_at FROM users WHERE id = $1', [req.user.userId])
+        if (result.rows.length > 0) {
+          user = result.rows[0]
+        }
+      } else {
+        // Get from in-memory storage
+        const fullUser = inMemoryUsers.get(req.user.userId)
+        if (fullUser) {
+          user = {
+            id: fullUser.id,
+            email: fullUser.email,
+            role: fullUser.role,
+            name: fullUser.name,
+            created_at: fullUser.created_at,
+            updated_at: fullUser.updated_at
+          }
+        }
+      }
+
+      if (!user) {
         return res.status(404).json({ error: 'User not found' })
       }
 
-      res.json(result.rows[0])
+      res.json(user)
     } catch (error) {
       console.error('Get user error:', error)
       res.status(500).json({ error: 'Internal server error' })
@@ -95,10 +115,6 @@ export function createAuthRoutes(pool: Pool | null, dbAvailable: boolean) {
   // Change password (requires authentication)
   router.post('/change-password', authenticateToken, async (req: Request, res: Response) => {
     try {
-      if (!pool || !dbAvailable) {
-        return res.status(503).json({ error: 'Database not available' })
-      }
-
       if (!req.user) {
         return res.status(401).json({ error: 'Not authenticated' })
       }
@@ -115,13 +131,22 @@ export function createAuthRoutes(pool: Pool | null, dbAvailable: boolean) {
         return res.status(400).json({ error: validation.message })
       }
 
-      // Get current user
-      const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.userId])
-      if (userResult.rows.length === 0) {
-        return res.status(404).json({ error: 'User not found' })
+      let user: any = null
+
+      if (dbAvailable && pool) {
+        // Get from database
+        const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.userId])
+        if (userResult.rows.length > 0) {
+          user = userResult.rows[0]
+        }
+      } else {
+        // Get from in-memory storage
+        user = inMemoryUsers.get(req.user.userId)
       }
 
-      const user = userResult.rows[0]
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' })
+      }
 
       // Verify current password
       const isValid = await comparePassword(currentPassword, user.password_hash)
@@ -132,11 +157,19 @@ export function createAuthRoutes(pool: Pool | null, dbAvailable: boolean) {
       // Hash new password
       const newPasswordHash = await hashPassword(newPassword)
 
-      // Update password
-      await pool.query(
-        'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
-        [newPasswordHash, req.user.userId]
-      )
+      if (dbAvailable && pool) {
+        // Update in database
+        await pool.query(
+          'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+          [newPasswordHash, req.user.userId]
+        )
+      } else {
+        // Update in-memory storage
+        user.password_hash = newPasswordHash
+        user.updated_at = new Date().toISOString()
+        inMemoryUsers.set(user.id, user)
+        inMemoryUsers.set(`email:${user.email}`, user)
+      }
 
       res.json({ message: 'Password changed successfully' })
     } catch (error) {

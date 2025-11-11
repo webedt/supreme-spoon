@@ -11,7 +11,7 @@ import {
   type UserRole
 } from './auth.js'
 
-export function createUserRoutes(pool: Pool | null, dbAvailable: boolean) {
+export function createUserRoutes(pool: Pool | null, dbAvailable: boolean, inMemoryUsers: Map<string, any>) {
   const router = Router()
 
   // All user management routes require admin role
@@ -20,17 +20,32 @@ export function createUserRoutes(pool: Pool | null, dbAvailable: boolean) {
   // Get all users (admin only)
   router.get('/', async (req: Request, res: Response) => {
     try {
-      if (!pool || !dbAvailable) {
-        return res.status(503).json({ error: 'Database not available' })
+      let users: any[] = []
+
+      if (dbAvailable && pool) {
+        // Get from database
+        const result = await pool.query(`
+          SELECT id, email, role, name, created_at, updated_at
+          FROM users
+          ORDER BY created_at DESC
+        `)
+        users = result.rows
+      } else {
+        // Get from in-memory storage
+        users = Array.from(inMemoryUsers.values())
+          .filter(u => !u.id.startsWith('email:')) // Filter out email index entries
+          .map(u => ({
+            id: u.id,
+            email: u.email,
+            role: u.role,
+            name: u.name,
+            created_at: u.created_at,
+            updated_at: u.updated_at
+          }))
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       }
 
-      const result = await pool.query(`
-        SELECT id, email, role, name, created_at, updated_at
-        FROM users
-        ORDER BY created_at DESC
-      `)
-
-      res.json(result.rows)
+      res.json(users)
     } catch (error) {
       console.error('Get users error:', error)
       res.status(500).json({ error: 'Internal server error' })
