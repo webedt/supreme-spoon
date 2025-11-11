@@ -2,8 +2,10 @@ import express, { Request, Response } from 'express'
 import cors from 'cors'
 import { Pool } from 'pg'
 import { createProxyMiddleware } from 'http-proxy-middleware'
+import { createServer } from 'http'
 
 const app = express()
+const server = createServer(app)
 const PORT = process.env.PORT || 3000
 const isDevelopment = process.env.NODE_ENV !== 'production'
 
@@ -187,18 +189,28 @@ if (isDevelopment) {
   const VITE_PORT = process.env.VITE_PORT || 5173
   const VITE_HOST = process.env.VITE_HOST || 'localhost'
 
-  // Proxy all non-API requests to Vite dev server
-  app.use(
-    '/',
-    createProxyMiddleware({
-      target: `http://${VITE_HOST}:${VITE_PORT}`,
-      changeOrigin: true,
-      ws: true, // Enable WebSocket proxying for HMR
-      logLevel: 'silent',
-      // Only proxy non-API requests
-      filter: (pathname) => !pathname.startsWith('/api') && pathname !== '/health',
-    })
-  )
+  // Create proxy middleware for Vite
+  const viteProxy = createProxyMiddleware({
+    target: `http://${VITE_HOST}:${VITE_PORT}`,
+    changeOrigin: true,
+    ws: true, // Enable WebSocket proxying for HMR
+    logLevel: 'info',
+    // Only proxy non-API requests
+    filter: (pathname) => !pathname.startsWith('/api') && pathname !== '/health',
+  })
+
+  // Apply proxy middleware
+  app.use('/', viteProxy)
+
+  // Manually handle WebSocket upgrade for HMR
+  server.on('upgrade', (req, socket, head) => {
+    const url = req.url || '/'
+    // Proxy WebSocket upgrades for non-API requests (this is for HMR)
+    if (!url.startsWith('/api') && url !== '/health') {
+      console.log(`🔌 WebSocket upgrade request: ${url}`)
+      viteProxy.upgrade(req, socket, head)
+    }
+  })
 
   console.log(`🔄 Development mode: Proxying to Vite dev server at http://${VITE_HOST}:${VITE_PORT}`)
 }
@@ -221,9 +233,12 @@ if (!isDevelopment) {
 async function start() {
   await initDatabase()
 
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`)
     console.log(`📡 API available at http://localhost:${PORT}/api/sessions`)
+    if (isDevelopment) {
+      console.log(`🔥 HMR enabled - WebSocket upgrades will be proxied to Vite`)
+    }
   })
 }
 
