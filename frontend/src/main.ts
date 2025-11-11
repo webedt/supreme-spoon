@@ -170,6 +170,16 @@ function selectTheme(themeId: string): void {
   setStoredTheme(themeId)
   applyTheme(themeId)
   updateThemeButton()
+
+  // Update the active class on theme options
+  document.querySelectorAll('.theme-option').forEach(option => {
+    if (option.getAttribute('data-theme') === themeId) {
+      option.classList.add('active')
+    } else {
+      option.classList.remove('active')
+    }
+  })
+
   closeThemeDropdown()
 }
 
