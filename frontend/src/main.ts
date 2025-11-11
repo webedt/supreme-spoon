@@ -175,10 +175,18 @@ function selectTheme(themeId: string): void {
 
 function updateThemeButton(): void {
   const button = document.querySelector<HTMLButtonElement>('#theme-toggle')
+  const dropdown = document.querySelector<HTMLDivElement>('#theme-dropdown')
   if (button) {
     const currentTheme = getCurrentTheme()
     const theme = themes.find(t => t.id === currentTheme) || themes[0]
-    button.innerHTML = `${theme.icon} ${theme.name} <span style="margin-left: 0.25rem;">▼</span>`
+    const isExpanded = dropdown?.classList.contains('show')
+
+    // Show only emoji when collapsed, emoji + text when expanded
+    if (isExpanded) {
+      button.innerHTML = `${theme.icon} ${theme.name} <span style="margin-left: 0.25rem;">▼</span>`
+    } else {
+      button.innerHTML = `${theme.icon} <span style="margin-left: 0.25rem;">▼</span>`
+    }
   }
 }
 
@@ -186,6 +194,7 @@ function toggleThemeDropdown(): void {
   const dropdown = document.querySelector<HTMLDivElement>('#theme-dropdown')
   if (dropdown) {
     dropdown.classList.toggle('show')
+    updateThemeButton() // Update button to show/hide text based on dropdown state
   }
 }
 
@@ -193,6 +202,7 @@ function closeThemeDropdown(): void {
   const dropdown = document.querySelector<HTMLDivElement>('#theme-dropdown')
   if (dropdown) {
     dropdown.classList.remove('show')
+    updateThemeButton() // Update button to show only emoji when closed
   }
 }
 
