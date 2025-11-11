@@ -14,7 +14,7 @@ interface Session {
   updatedAt?: string   // For backwards compatibility
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.PROD ? '' : 'http://localhost:3000')
+const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 const CURRENT_SESSION_KEY = 'currentSession'
 
 // Cache for sessions to avoid excessive API calls

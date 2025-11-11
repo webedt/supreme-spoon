@@ -6,7 +6,28 @@ const app = express()
 const PORT = process.env.PORT || 3001
 
 // Middleware
-app.use(cors())
+// Configure CORS to allow requests from the reverse proxy and deployed domains
+const corsOptions = {
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true)
+
+    // Allow all etdofresh.com subdomains and localhost for development
+    const allowedPatterns = [
+      /^https?:\/\/localhost(:\d+)?$/,
+      /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+      /^https?:\/\/.*\.etdofresh\.com$/,
+    ]
+
+    const isAllowed = allowedPatterns.some(pattern => pattern.test(origin))
+    callback(null, isAllowed)
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}
+
+app.use(cors(corsOptions))
 app.use(express.json())
 
 // Database connection
