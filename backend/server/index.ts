@@ -139,13 +139,13 @@ async function createDefaultAdmin() {
       await pool.query(`
         INSERT INTO users (id, email, password_hash, role, name)
         VALUES ($1, $2, $3, $4, $5)
-      `, [adminId, 'admin@example.com', passwordHash, 'admin', 'Admin User'])
+      `, [adminId, 'admin@webedt.com', passwordHash, 'admin', 'Admin User'])
 
       console.log('')
       console.log('🔐 ═══════════════════════════════════════════════════════')
       console.log('🔐 DEFAULT ADMIN USER CREATED')
       console.log('🔐 ═══════════════════════════════════════════════════════')
-      console.log('🔐 Email:    admin@example.com')
+      console.log('🔐 Email:    admin@webedt.com')
       console.log(`🔐 Password: ${defaultPassword}`)
       console.log('🔐 ═══════════════════════════════════════════════════════')
       console.log('🔐 ⚠️  IMPORTANT: Change this password immediately!')
@@ -188,7 +188,7 @@ async function createInMemoryAdmin() {
 
     const adminUser = {
       id: adminId,
-      email: 'admin@example.com',
+      email: 'admin@webedt.com',
       password_hash: passwordHash,
       role: 'admin',
       name: 'Admin User',
@@ -204,7 +204,7 @@ async function createInMemoryAdmin() {
     console.log('🔐 ═══════════════════════════════════════════════════════')
     console.log('🔐 IN-MEMORY ADMIN USER CREATED')
     console.log('🔐 ═══════════════════════════════════════════════════════')
-    console.log('🔐 Email:    admin@example.com')
+    console.log('🔐 Email:    admin@webedt.com')
     console.log(`🔐 Password: ${defaultPassword}`)
     console.log('🔐 ═══════════════════════════════════════════════════════')
     console.log('🔐 ⚠️  IMPORTANT: This is temporary and will be lost on restart!')
@@ -616,20 +616,20 @@ app.post('/reset-admin', async (req: Request, res: Response) => {
     await pool.query(`
       INSERT INTO users (id, email, password_hash, role, name)
       VALUES ($1, $2, $3, $4, $5)
-    `, [adminId, 'admin@example.com', passwordHash, 'admin', 'Admin User'])
+    `, [adminId, 'admin@webedt.com', passwordHash, 'admin', 'Admin User'])
 
     console.log('')
     console.log('🔐 ═══════════════════════════════════════════════════════')
     console.log('🔐 ADMIN PASSWORD RESET')
     console.log('🔐 ═══════════════════════════════════════════════════════')
-    console.log('🔐 Email:    admin@example.com')
+    console.log('🔐 Email:    admin@webedt.com')
     console.log(`🔐 Password: ${defaultPassword}`)
     console.log('🔐 ═══════════════════════════════════════════════════════')
     console.log('')
 
     res.json({
       message: 'Admin password reset successfully',
-      email: 'admin@example.com',
+      email: 'admin@webedt.com',
       password: defaultPassword
     })
   } catch (error) {

@@ -33,7 +33,7 @@ export const loginPage: Page = {
               required
               autocomplete="email"
               style="width: 100%; padding: 0.75rem; border: 1px solid #444; border-radius: 6px; background: #2a2a2a; color: #e0e0e0; font-size: 1rem;"
-              placeholder="admin@example.com"
+              placeholder="admin@webedt.com"
             />
           </div>
 
@@ -66,7 +66,7 @@ export const loginPage: Page = {
 
         <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #444; text-align: center; color: #888;">
           <p style="margin: 0;">
-            <strong>Default Admin:</strong> admin@example.com<br/>
+            <strong>Default Admin:</strong> admin@webedt.com<br/>
             <small>Check server logs for the password</small>
           </p>
         </div>
