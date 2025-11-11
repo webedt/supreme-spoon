@@ -3,6 +3,10 @@ import cors from 'cors'
 import { Pool } from 'pg'
 import * as fs from 'fs'
 import * as path from 'path'
+import { hashPassword, generateRandomPassword } from './auth.js'
+import { v4 as uuidv4 } from 'uuid'
+import { createAuthRoutes } from './authRoutes.js'
+import { createUserRoutes } from './userRoutes.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -70,6 +74,7 @@ async function initDatabase() {
   }
 
   try {
+    // Create sessions table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS sessions (
         id VARCHAR(50) PRIMARY KEY,
@@ -84,12 +89,71 @@ async function initDatabase() {
 
       CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at DESC);
     `)
+
+    // Create users table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(50) PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        role VARCHAR(20) NOT NULL DEFAULT 'free',
+        name VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+      CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+    `)
+
     console.log('✅ Database schema initialized')
     dbAvailable = true
+
+    // Create default admin user if none exists
+    await createDefaultAdmin()
   } catch (error) {
     console.error('❌ Error initializing database:', error)
     console.error('❌ Sessions will not be persisted until database is available')
     dbAvailable = false
+  }
+}
+
+// Create default admin user
+async function createDefaultAdmin() {
+  if (!pool || !dbAvailable) {
+    return
+  }
+
+  try {
+    // Check if any admin users exist
+    const result = await pool.query(`SELECT COUNT(*) as count FROM users WHERE role = 'admin'`)
+    const adminCount = parseInt(result.rows[0].count)
+
+    if (adminCount === 0) {
+      // Generate a random password
+      const defaultPassword = generateRandomPassword()
+      const passwordHash = await hashPassword(defaultPassword)
+      const adminId = uuidv4()
+
+      // Create the admin user
+      await pool.query(`
+        INSERT INTO users (id, email, password_hash, role, name)
+        VALUES ($1, $2, $3, $4, $5)
+      `, [adminId, 'admin@example.com', passwordHash, 'admin', 'Admin User'])
+
+      console.log('')
+      console.log('🔐 ═══════════════════════════════════════════════════════')
+      console.log('🔐 DEFAULT ADMIN USER CREATED')
+      console.log('🔐 ═══════════════════════════════════════════════════════')
+      console.log('🔐 Email:    admin@example.com')
+      console.log(`🔐 Password: ${defaultPassword}`)
+      console.log('🔐 ═══════════════════════════════════════════════════════')
+      console.log('🔐 ⚠️  IMPORTANT: Change this password immediately!')
+      console.log('🔐 ═══════════════════════════════════════════════════════')
+      console.log('')
+    }
+  } catch (error) {
+    console.error('❌ Error creating default admin user:', error)
   }
 }
 
@@ -507,10 +571,18 @@ async function start() {
     })
   }
 
+  // Mount auth routes (after pool initialization)
+  const authRoutes = createAuthRoutes(pool, dbAvailable)
+  app.use('/auth', authRoutes)
+
+  // Mount user management routes (admin only)
+  const userRoutes = createUserRoutes(pool, dbAvailable)
+  app.use('/users', userRoutes)
+
   // Start listening immediately (don't wait for database)
   app.listen(PORT, () => {
     console.log(`✅ Backend API server running on port ${PORT}`)
-    console.log(`📡 Routes: /sessions, /sessions/:id, /llm-txt, /health`)
+    console.log(`📡 Routes: /sessions, /auth, /users, /llm-txt, /health`)
     console.log(`📡 (accessed via reverse proxy at /api/...)`)
     console.log(`💾 Storage mode: ${dbAvailable ? 'PostgreSQL' : 'In-Memory (temporary)'}`)
 
