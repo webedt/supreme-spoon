@@ -445,8 +445,8 @@ function readDirectoryRecursive(
 // Get llm.txt content (repo source as text)
 app.get('/llm-txt', (req: Request, res: Response) => {
   try {
-    // Get the repo root (go up from backend/server to repo root)
-    const repoRoot = path.resolve(__dirname, '..', '..')
+    // Get the repo root (current working directory)
+    const repoRoot = process.cwd()
     const gitignorePath = path.join(repoRoot, '.gitignore')
 
     // Parse .gitignore patterns
