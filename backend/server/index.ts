@@ -602,15 +602,17 @@ async function start() {
   console.log('🚀 Starting backend server...')
   console.log(`📡 Port: ${PORT}`)
 
-  // Initialize database pool (non-blocking)
+  // Initialize database pool
   initPool()
 
-  // Try to initialize database schema (non-blocking)
+  // Try to initialize database schema (wait for it to complete)
   if (pool) {
-    initDatabase().catch(err => {
+    try {
+      await initDatabase()
+    } catch (err) {
       console.error('❌ Failed to initialize database:', err)
       console.log('⚠️  Continuing with in-memory storage')
-    })
+    }
   }
 
   // Create in-memory admin user if database is not available
@@ -626,7 +628,7 @@ async function start() {
   const userRoutes = createUserRoutes(pool, dbAvailable, inMemoryUsers)
   app.use('/users', userRoutes)
 
-  // Start listening immediately (don't wait for database)
+  // Start listening
   app.listen(PORT, () => {
     console.log(`✅ Backend API server running on port ${PORT}`)
     console.log(`📡 Routes: /sessions, /auth, /users, /llm-txt, /health`)
