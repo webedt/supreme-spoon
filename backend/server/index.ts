@@ -3,6 +3,10 @@ import cors from 'cors'
 import { Pool } from 'pg'
 import * as fs from 'fs'
 import * as path from 'path'
+import { hashPassword, generateRandomPassword } from './auth.js'
+import { v4 as uuidv4 } from 'uuid'
+import { createAuthRoutes } from './authRoutes.js'
+import { createUserRoutes } from './userRoutes.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -70,6 +74,7 @@ async function initDatabase() {
   }
 
   try {
+    // Create sessions table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS sessions (
         id VARCHAR(50) PRIMARY KEY,
@@ -84,8 +89,28 @@ async function initDatabase() {
 
       CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at DESC);
     `)
+
+    // Create users table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(50) PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        role VARCHAR(20) NOT NULL DEFAULT 'free',
+        name VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+      CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+    `)
+
     console.log('✅ Database schema initialized')
     dbAvailable = true
+
+    // Create default admin user if none exists
+    await createDefaultAdmin()
   } catch (error) {
     console.error('❌ Error initializing database:', error)
     console.error('❌ Sessions will not be persisted until database is available')
@@ -93,8 +118,50 @@ async function initDatabase() {
   }
 }
 
+// Create default admin user
+async function createDefaultAdmin() {
+  if (!pool || !dbAvailable) {
+    return
+  }
+
+  try {
+    // Check if any admin users exist
+    const result = await pool.query(`SELECT COUNT(*) as count FROM users WHERE role = 'admin'`)
+    const adminCount = parseInt(result.rows[0].count)
+
+    if (adminCount === 0) {
+      // Generate a random password
+      const defaultPassword = generateRandomPassword()
+      const passwordHash = await hashPassword(defaultPassword)
+      const adminId = uuidv4()
+
+      // Create the admin user
+      await pool.query(`
+        INSERT INTO users (id, email, password_hash, role, name)
+        VALUES ($1, $2, $3, $4, $5)
+      `, [adminId, 'admin@webedt.com', passwordHash, 'admin', 'Admin User'])
+
+      console.log('')
+      console.log('🔐 ═══════════════════════════════════════════════════════')
+      console.log('🔐 DEFAULT ADMIN USER CREATED')
+      console.log('🔐 ═══════════════════════════════════════════════════════')
+      console.log('🔐 Email:    admin@webedt.com')
+      console.log(`🔐 Password: ${defaultPassword}`)
+      console.log('🔐 ═══════════════════════════════════════════════════════')
+      console.log('🔐 ⚠️  IMPORTANT: Change this password immediately!')
+      console.log('🔐 ═══════════════════════════════════════════════════════')
+      console.log('')
+    }
+  } catch (error) {
+    console.error('❌ Error creating default admin user:', error)
+  }
+}
+
 // In-memory session storage fallback
 const inMemorySessions: Map<string, Session> = new Map()
+
+// In-memory user storage fallback
+const inMemoryUsers: Map<string, any> = new Map()
 
 // Session interface
 interface Session {
@@ -106,6 +173,45 @@ interface Session {
   output: string
   created_at?: string
   updated_at?: string
+}
+
+// Create in-memory admin user
+async function createInMemoryAdmin() {
+  // Check if admin already exists
+  const hasAdmin = Array.from(inMemoryUsers.values()).some(u => u.role === 'admin')
+
+  if (!hasAdmin) {
+    const defaultPassword = generateRandomPassword()
+    const passwordHash = await hashPassword(defaultPassword)
+    const adminId = uuidv4()
+    const now = new Date().toISOString()
+
+    const adminUser = {
+      id: adminId,
+      email: 'admin@webedt.com',
+      password_hash: passwordHash,
+      role: 'admin',
+      name: 'Admin User',
+      created_at: now,
+      updated_at: now
+    }
+
+    inMemoryUsers.set(adminId, adminUser)
+    // Also index by email for easy lookup
+    inMemoryUsers.set(`email:${adminUser.email}`, adminUser)
+
+    console.log('')
+    console.log('🔐 ═══════════════════════════════════════════════════════')
+    console.log('🔐 IN-MEMORY ADMIN USER CREATED')
+    console.log('🔐 ═══════════════════════════════════════════════════════')
+    console.log('🔐 Email:    admin@webedt.com')
+    console.log(`🔐 Password: ${defaultPassword}`)
+    console.log('🔐 ═══════════════════════════════════════════════════════')
+    console.log('🔐 ⚠️  IMPORTANT: This is temporary and will be lost on restart!')
+    console.log('🔐 ⚠️  Set DATABASE_URL for persistent user storage')
+    console.log('🔐 ═══════════════════════════════════════════════════════')
+    console.log('')
+  }
 }
 
 // API Routes
@@ -480,6 +586,138 @@ app.get('/llm-txt', (req: Request, res: Response) => {
   }
 })
 
+// Reset admin endpoint (TEMPORARY - UNSECURED FOR DEVELOPMENT ONLY)
+// WARNING: This endpoint has NO authentication and should be removed in production!
+
+// GET endpoint - returns instructions AND performs reset
+app.get('/reset-admin', async (req: Request, res: Response) => {
+  try {
+    let passwordResult = ''
+
+    if (!pool || !dbAvailable) {
+      passwordResult = `
+❌ ERROR: Database not available
+---------------------------------
+Cannot reset admin password without database connection.
+Set DATABASE_URL environment variable to enable database.
+`
+    } else {
+      // Delete all existing admin users
+      await pool.query(`DELETE FROM users WHERE role = 'admin'`)
+
+      // Create new admin user with random password
+      const defaultPassword = generateRandomPassword()
+      const passwordHash = await hashPassword(defaultPassword)
+      const adminId = uuidv4()
+
+      await pool.query(`
+        INSERT INTO users (id, email, password_hash, role, name)
+        VALUES ($1, $2, $3, $4, $5)
+      `, [adminId, 'admin@webedt.com', passwordHash, 'admin', 'Admin User'])
+
+      console.log('')
+      console.log('🔐 ═══════════════════════════════════════════════════════')
+      console.log('🔐 ADMIN PASSWORD RESET')
+      console.log('🔐 ═══════════════════════════════════════════════════════')
+      console.log('🔐 Email:    admin@webedt.com')
+      console.log(`🔐 Password: ${defaultPassword}`)
+      console.log('🔐 ═══════════════════════════════════════════════════════')
+      console.log('')
+
+      passwordResult = `
+✅ ADMIN PASSWORD RESET SUCCESSFUL
+===================================
+
+Email:    admin@webedt.com
+Password: ${defaultPassword}
+
+⚠️  Save this password! This page will show a NEW password on each refresh.
+⚠️  The password is also logged to the server console.
+`
+    }
+
+    const instructions = `
+Admin Password Reset Endpoint
+==============================
+
+⚠️  WARNING: This endpoint is UNSECURED and for DEVELOPMENT ONLY!
+⚠️  Remove or secure this endpoint before production deployment!
+
+How to Use:
+-----------
+
+GET (Browser):
+  Simply visit this URL to reset and display the new password.
+  ${req.protocol}://${req.get('host')}/api/reset-admin
+
+POST (API/curl):
+  curl -X POST ${req.protocol}://${req.get('host')}/api/reset-admin
+
+JavaScript (browser console):
+  fetch('/api/reset-admin', { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+      console.log('Email:', data.email)
+      console.log('Password:', data.password)
+    })
+
+POST Response (JSON):
+{
+  "message": "Admin password reset successfully",
+  "email": "admin@webedt.com",
+  "password": "randomly-generated-password"
+}
+
+${passwordResult}`
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+    res.send(instructions)
+  } catch (error) {
+    console.error('Reset admin error:', error)
+    res.status(500).send('Error resetting admin password. Check server logs.')
+  }
+})
+
+// POST endpoint - performs the reset
+app.post('/reset-admin', async (req: Request, res: Response) => {
+  try {
+    if (!pool || !dbAvailable) {
+      return res.status(503).json({ error: 'Database not available' })
+    }
+
+    // Delete all existing admin users
+    await pool.query(`DELETE FROM users WHERE role = 'admin'`)
+
+    // Create new admin user with random password
+    const defaultPassword = generateRandomPassword()
+    const passwordHash = await hashPassword(defaultPassword)
+    const adminId = uuidv4()
+
+    await pool.query(`
+      INSERT INTO users (id, email, password_hash, role, name)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [adminId, 'admin@webedt.com', passwordHash, 'admin', 'Admin User'])
+
+    console.log('')
+    console.log('🔐 ═══════════════════════════════════════════════════════')
+    console.log('🔐 ADMIN PASSWORD RESET')
+    console.log('🔐 ═══════════════════════════════════════════════════════')
+    console.log('🔐 Email:    admin@webedt.com')
+    console.log(`🔐 Password: ${defaultPassword}`)
+    console.log('🔐 ═══════════════════════════════════════════════════════')
+    console.log('')
+
+    res.json({
+      message: 'Admin password reset successfully',
+      email: 'admin@webedt.com',
+      password: defaultPassword
+    })
+  } catch (error) {
+    console.error('Reset admin error:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
   res.json({
@@ -496,21 +734,36 @@ async function start() {
   console.log('🚀 Starting backend server...')
   console.log(`📡 Port: ${PORT}`)
 
-  // Initialize database pool (non-blocking)
+  // Initialize database pool
   initPool()
 
-  // Try to initialize database schema (non-blocking)
+  // Try to initialize database schema (wait for it to complete)
   if (pool) {
-    initDatabase().catch(err => {
+    try {
+      await initDatabase()
+    } catch (err) {
       console.error('❌ Failed to initialize database:', err)
       console.log('⚠️  Continuing with in-memory storage')
-    })
+    }
   }
 
-  // Start listening immediately (don't wait for database)
+  // Create in-memory admin user if database is not available
+  if (!dbAvailable) {
+    await createInMemoryAdmin()
+  }
+
+  // Mount auth routes (after pool initialization)
+  const authRoutes = createAuthRoutes(pool, dbAvailable, inMemoryUsers)
+  app.use('/auth', authRoutes)
+
+  // Mount user management routes (admin only)
+  const userRoutes = createUserRoutes(pool, dbAvailable, inMemoryUsers)
+  app.use('/users', userRoutes)
+
+  // Start listening
   app.listen(PORT, () => {
     console.log(`✅ Backend API server running on port ${PORT}`)
-    console.log(`📡 Routes: /sessions, /sessions/:id, /llm-txt, /health`)
+    console.log(`📡 Routes: /sessions, /auth, /users, /llm-txt, /health`)
     console.log(`📡 (accessed via reverse proxy at /api/...)`)
     console.log(`💾 Storage mode: ${dbAvailable ? 'PostgreSQL' : 'In-Memory (temporary)'}`)
 

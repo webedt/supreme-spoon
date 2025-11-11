@@ -5,6 +5,12 @@
 echo "🚀 Starting all services..."
 echo ""
 
+# Load .env file if it exists (for local development)
+if [ -f .env ]; then
+  echo "📄 Loading .env file..."
+  export $(cat .env | grep -v '^#' | xargs)
+fi
+
 # Set default environment variables if not already set
 # Note: PORT is NOT set to avoid conflicts between services
 export BACKEND_URL=${BACKEND_URL:-http://localhost:3001}

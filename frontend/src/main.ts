@@ -6,6 +6,7 @@ import './styles/main.css'
 // Import utilities
 import { applyTheme, getCurrentTheme, watchSystemTheme } from './utils/theme'
 import { initRouter, getCurrentPage, getPageById } from './utils/router'
+import { isAuthenticated, isAdmin, onAuthChange } from './utils/auth'
 
 // Import components
 import { renderHeader, updatePageTitle, updateDocumentTitle, attachHeaderListeners, updateThemeButton } from './components/header'
@@ -17,9 +18,28 @@ import { sessionsPage, attachSessionsListeners } from './pages/sessions'
 import { aboutPage, attachAboutListeners } from './pages/about'
 import { settingsPage, attachSettingsListeners } from './pages/settings'
 import { llmTxtPage, attachLlmTxtListeners } from './pages/llm-txt'
+import { loginPage, attachLoginListeners } from './pages/login'
+import { accountPage, attachAccountListeners } from './pages/account'
+import { usersPage, attachUsersListeners } from './pages/users'
 
-// Define all pages
-const pages = [homePage, sessionsPage, aboutPage, settingsPage, llmTxtPage]
+// Define all pages (users page only visible to admins)
+function getPages() {
+  const basePages = [homePage, sessionsPage, aboutPage, settingsPage, llmTxtPage]
+
+  if (isAuthenticated()) {
+    basePages.push(accountPage)
+
+    if (isAdmin()) {
+      basePages.push(usersPage)
+    }
+  } else {
+    basePages.push(loginPage)
+  }
+
+  return basePages
+}
+
+const pages = getPages()
 
 /**
  * Render a page by ID
@@ -66,6 +86,15 @@ function attachPageEventListeners(pageId: string): void {
       break
     case 'llm-txt':
       attachLlmTxtListeners()
+      break
+    case 'login':
+      attachLoginListeners()
+      break
+    case 'account':
+      attachAccountListeners()
+      break
+    case 'users':
+      attachUsersListeners()
       break
   }
 }
@@ -122,6 +151,13 @@ function init(): void {
     applyTheme(newTheme)
     updateThemeButton()
     updateDocumentTitle()
+  })
+
+  // Watch for auth state changes
+  onAuthChange((user) => {
+    // Auth state changed, you might want to reload the app
+    // For now, we'll just log it
+    console.log('Auth state changed:', user)
   })
 }
 

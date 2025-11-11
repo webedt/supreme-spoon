@@ -6,18 +6,25 @@
 
 ### After Git Push
 - **ALWAYS** display the deployment URL after a successful `git push`
-- The deployment URL format is: `https://{repo-name}-{branch-name}.etdofresh.com`
-  - Repository name: `supreme-spoon`
-  - Branch name: Current branch (lowercase, special chars replaced with hyphens)
-  - Example: `https://supreme-spoon-claude-add-sidebar-pages-011cuzvwtxvc5aagjgbmt3eh.etdofresh.com`
+- **CRITICAL**: Always use the `scripts/get-deployment-url.sh` script to get the accurate deployment URL
+  - This script implements the exact same naming logic as the GitHub Actions workflow
+  - Run: `./scripts/get-deployment-url.sh` to get the correct URL
+  - The script handles DNS length constraints and uses the appropriate naming strategy
 - Display the URL as a clickable markdown link
 - Remind the user that the deployment will be live once the GitHub Actions workflow completes
+
+**Example:**
+```bash
+./scripts/get-deployment-url.sh
+# Output: https://webedt-simple-soup-011cv2pbjmvqh5xntodksanu.etdofresh.com
+```
 
 - **ALWAYS** also display a link to the GitHub repository with the current branch
   - GitHub repository link format: `https://github.com/{owner}/{repo}/tree/{branch}`
   - Owner: `webedt`
-  - Repository: `supreme-spoon`
-  - Example: `https://github.com/webedt/supreme-spoon/tree/claude/rename-to-example-application-011CV15wcRN9L6Qhz35QN5qZ`
+  - Repository: `simple-soup`
+  - Get current branch: `git branch --show-current`
+  - Example: `https://github.com/webedt/simple-soup/tree/claude/add-user-auth-system-011CV2pBjmvQH5XnToDKSAnU`
 - Display the GitHub link as a clickable markdown link
 
 ### Development Mode Configuration
