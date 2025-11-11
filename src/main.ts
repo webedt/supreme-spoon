@@ -332,11 +332,11 @@ const pages: Page[] = [
   },
   {
     id: 'about',
-    title: 'About',
+    title: 'About Us',
     icon: 'ℹ️',
     render: () => `
       <div class="page-content">
-        <h1>About</h1>
+        <h1>About Us</h1>
         <p class="message">
           This is a multi-page application built with vanilla TypeScript and Vite.
         </p>
