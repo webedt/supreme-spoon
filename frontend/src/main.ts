@@ -193,8 +193,18 @@ function updateThemeButton(): void {
 function toggleThemeDropdown(): void {
   const dropdown = document.querySelector<HTMLDivElement>('#theme-dropdown')
   if (dropdown) {
+    const wasHidden = !dropdown.classList.contains('show')
     dropdown.classList.toggle('show')
     updateThemeButton() // Update button to show/hide text based on dropdown state
+
+    // Focus the currently active theme when opening the dropdown
+    if (wasHidden && dropdown.classList.contains('show')) {
+      const activeOption = dropdown.querySelector<HTMLButtonElement>('.theme-option.active')
+      if (activeOption) {
+        // Use setTimeout to ensure the dropdown is visible before focusing
+        setTimeout(() => activeOption.focus(), 0)
+      }
+    }
   }
 }
 
