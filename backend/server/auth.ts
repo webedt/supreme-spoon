@@ -139,9 +139,6 @@ export function isValidPassword(password: string): { valid: boolean; message?: s
   if (!/[a-z]/.test(password)) {
     return { valid: false, message: 'Password must contain at least one lowercase letter' }
   }
-  if (!/[A-Z]/.test(password)) {
-    return { valid: false, message: 'Password must contain at least one uppercase letter' }
-  }
   if (!/[0-9]/.test(password)) {
     return { valid: false, message: 'Password must contain at least one number' }
   }
