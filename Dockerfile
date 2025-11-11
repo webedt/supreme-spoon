@@ -1,5 +1,5 @@
 # Multi-stage build supporting both development and production
-ARG NODE_ENV=production
+ARG NODE_ENV=development
 
 # Build stage (only for production)
 FROM node:20 AS builder
