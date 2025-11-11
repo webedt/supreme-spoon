@@ -3,29 +3,23 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "reverse-proxy"
+  ],
   "scripts": {
-    "dev": "concurrently \"npm run server:dev\" \"vite\"",
-    "dev:frontend": "vite",
-    "dev:backend": "tsx watch server/index.ts",
-    "server:dev": "tsx watch server/index.ts",
-    "build": "tsc && vite build",
-    "start": "NODE_ENV=production tsx server/index.ts",
-    "preview": "vite preview"
+    "dev": "concurrently --names \"BACKEND,FRONTEND,PROXY\" -c \"bgBlue,bgMagenta,bgGreen\" \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\" \"npm run dev --workspace=reverse-proxy\"",
+    "build": "npm run build --workspaces",
+    "start": "concurrently --names \"BACKEND,FRONTEND,PROXY\" -c \"bgBlue,bgMagenta,bgGreen\" \"npm run start --workspace=backend\" \"npm run start --workspace=frontend\" \"npm run start --workspace=reverse-proxy\"",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:proxy": "npm run dev --workspace=reverse-proxy",
+    "build:frontend": "npm run build --workspace=frontend",
+    "build:backend": "npm run build --workspace=backend",
+    "build:proxy": "npm run build --workspace=reverse-proxy"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.5",
-    "@types/node": "^24.10.0",
-    "@types/pg": "^8.15.6",
-    "concurrently": "^9.2.1",
-    "typescript": "^5.6.2",
-    "vite": "^6.0.1"
-  },
-  "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^5.1.0",
-    "http-proxy-middleware": "^3.0.5",
-    "pg": "^8.16.3",
-    "tsx": "^4.20.6"
+    "concurrently": "^9.2.1"
   }
 }
