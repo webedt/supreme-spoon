@@ -170,22 +170,61 @@ function selectTheme(themeId: string): void {
   setStoredTheme(themeId)
   applyTheme(themeId)
   updateThemeButton()
+  updateDocumentTitle()
+
+  // Update the active class on theme options
+  document.querySelectorAll('.theme-option').forEach(option => {
+    if (option.getAttribute('data-theme') === themeId) {
+      option.classList.add('active')
+    } else {
+      option.classList.remove('active')
+    }
+  })
+
   closeThemeDropdown()
 }
 
 function updateThemeButton(): void {
   const button = document.querySelector<HTMLButtonElement>('#theme-toggle')
+  const dropdown = document.querySelector<HTMLDivElement>('#theme-dropdown')
   if (button) {
     const currentTheme = getCurrentTheme()
     const theme = themes.find(t => t.id === currentTheme) || themes[0]
-    button.innerHTML = `${theme.icon} ${theme.name} <span style="margin-left: 0.25rem;">▼</span>`
+    const isExpanded = dropdown?.classList.contains('show')
+
+    // Show only emoji when collapsed, emoji + text when expanded
+    if (isExpanded) {
+      button.innerHTML = `${theme.icon} ${theme.name} <span style="margin-left: 0.25rem;">▼</span>`
+    } else {
+      button.innerHTML = `${theme.icon} <span style="margin-left: 0.25rem;">▼</span>`
+    }
   }
+}
+
+function updateDocumentTitle(): void {
+  const currentTheme = getCurrentTheme()
+  const theme = themes.find(t => t.id === currentTheme) || themes[0]
+  const currentPage = getCurrentPage()
+  const page = pages.find(p => p.id === currentPage) || pages[0]
+
+  document.title = `${page.title} ${theme.icon} - Example Application`
 }
 
 function toggleThemeDropdown(): void {
   const dropdown = document.querySelector<HTMLDivElement>('#theme-dropdown')
   if (dropdown) {
+    const wasHidden = !dropdown.classList.contains('show')
     dropdown.classList.toggle('show')
+    updateThemeButton() // Update button to show/hide text based on dropdown state
+
+    // Focus the currently active theme when opening the dropdown
+    if (wasHidden && dropdown.classList.contains('show')) {
+      const activeOption = dropdown.querySelector<HTMLButtonElement>('.theme-option.active')
+      if (activeOption) {
+        // Use setTimeout to ensure the dropdown is visible before focusing
+        setTimeout(() => activeOption.focus(), 0)
+      }
+    }
   }
 }
 
@@ -193,6 +232,7 @@ function closeThemeDropdown(): void {
   const dropdown = document.querySelector<HTMLDivElement>('#theme-dropdown')
   if (dropdown) {
     dropdown.classList.remove('show')
+    updateThemeButton() // Update button to show only emoji when closed
   }
 }
 
@@ -771,10 +811,16 @@ window.addEventListener('hashchange', () => {
   if (pageTitleElement && page) {
     pageTitleElement.textContent = page.title
   }
+
+  // Update document title with theme emoji
+  updateDocumentTitle()
 })
 
 // Render initial page
 renderPage(getCurrentPage())
+
+// Set initial document title with theme emoji
+updateDocumentTitle()
 
 // Listen for system theme changes
 window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
@@ -782,5 +828,6 @@ window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e
   if (!getStoredTheme()) {
     applyTheme(e.matches ? 'light' : 'dark')
     updateThemeButton()
+    updateDocumentTitle()
   }
 })
