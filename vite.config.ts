@@ -18,14 +18,7 @@ export default defineConfig({
     // Allow all hosts (disable host check for dynamic Dokploy subdomains)
     allowedHosts: ['.etdofresh.com', 'localhost', '127.0.0.1'],
 
-    // HMR configuration for hot reloading
-    // Use client port for WebSocket connection through reverse proxy
-    hmr: {
-      clientPort: 443, // Connect through HTTPS port
-      protocol: 'wss', // Use secure WebSocket for HTTPS
-    },
-
-    // Watch configuration for file changes (still useful for detecting changes)
+    // Watch configuration for file changes
     watch: {
       // Poll for changes (useful in Docker volumes on some systems)
       usePolling: true,

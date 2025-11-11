@@ -20,6 +20,33 @@
   - Example: `https://github.com/webedt/supreme-spoon/tree/claude/rename-to-example-application-011CV15wcRN9L6Qhz35QN5qZ`
 - Display the GitHub link as a clickable markdown link
 
+### Development Mode Configuration
+
+**CRITICAL**: This application should remain in **development mode** for the foreseeable future.
+
+**Why Development Mode:**
+- Enables Hot Module Reload (HMR) for instant code updates
+- Browser automatically refreshes when code changes are deployed
+- No manual refresh needed to see changes
+- Better developer experience during active development
+
+**Current Configuration:**
+- `Dockerfile`: Set to `NODE_ENV=development` by default
+- Vite dev server runs on port 5173 with HMR enabled
+- Express server on port 3000 proxies to Vite (including WebSocket for HMR)
+- HMR configured for reverse proxy with WSS (secure WebSocket)
+
+**DO NOT** change to production mode unless explicitly requested. Development mode is intentional for this project.
+
+**How HMR Works:**
+```
+Browser → HTTPS (443) → Dokploy Proxy → HTTP (3000) → Express → HTTP (5173) → Vite Dev Server
+                                                             ↓
+                                                        WebSocket (HMR)
+                                                             ↓
+                                                    Browser Auto-Refresh
+```
+
 ## Overview
 
 Dokploy provides a comprehensive REST API for managing applications, databases, and deployments programmatically. The API is particularly useful for CI/CD pipelines, automation scripts, and custom integrations.
