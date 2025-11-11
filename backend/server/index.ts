@@ -6,16 +6,67 @@ const app = express()
 const PORT = process.env.PORT || 3001
 
 // Middleware
-app.use(cors())
+// Configure CORS to allow requests from the reverse proxy and deployed domains
+const corsOptions = {
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true)
+
+    // Allow all etdofresh.com subdomains and localhost for development
+    const allowedPatterns = [
+      /^https?:\/\/localhost(:\d+)?$/,
+      /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+      /^https?:\/\/.*\.etdofresh\.com$/,
+    ]
+
+    const isAllowed = allowedPatterns.some(pattern => pattern.test(origin))
+    callback(null, isAllowed)
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}
+
+app.use(cors(corsOptions))
 app.use(express.json())
 
-// Database connection
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:1j5scrtsy1mgpr0a@webedt-app-webedt-mejega:5432/webedt',
-})
+// Database connection with error handling
+let pool: Pool | null = null
+let dbAvailable = false
+
+function initPool() {
+  const dbUrl = process.env.DATABASE_URL
+
+  if (!dbUrl) {
+    console.warn('⚠️  No DATABASE_URL environment variable set')
+    console.warn('⚠️  Database functionality will be disabled')
+    console.warn('⚠️  Set DATABASE_URL to enable session persistence')
+    return null
+  }
+
+  try {
+    pool = new Pool({ connectionString: dbUrl })
+
+    // Test the connection
+    pool.on('error', (err) => {
+      console.error('❌ Database connection error:', err)
+      dbAvailable = false
+    })
+
+    return pool
+  } catch (error) {
+    console.error('❌ Failed to initialize database pool:', error)
+    return null
+  }
+}
 
 // Initialize database schema
 async function initDatabase() {
+  if (!pool) {
+    console.log('⚠️  Skipping database initialization (no pool available)')
+    return
+  }
+
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS sessions (
@@ -32,10 +83,16 @@ async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at DESC);
     `)
     console.log('✅ Database schema initialized')
+    dbAvailable = true
   } catch (error) {
     console.error('❌ Error initializing database:', error)
+    console.error('❌ Sessions will not be persisted until database is available')
+    dbAvailable = false
   }
 }
+
+// In-memory session storage fallback
+const inMemorySessions: Map<string, Session> = new Map()
 
 // Session interface
 interface Session {
@@ -50,39 +107,68 @@ interface Session {
 }
 
 // API Routes
+// Note: Routes don't include /api prefix because reverse proxy handles that
 
 // Get all sessions
-app.get('/api/sessions', async (req: Request, res: Response) => {
+app.get('/sessions', async (req: Request, res: Response) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM sessions ORDER BY created_at DESC'
-    )
-    res.json(result.rows)
+    if (dbAvailable && pool) {
+      const result = await pool.query(
+        'SELECT * FROM sessions ORDER BY created_at DESC'
+      )
+      res.json(result.rows)
+    } else {
+      // Use in-memory storage as fallback
+      const sessions = Array.from(inMemorySessions.values())
+        .sort((a, b) => {
+          const dateA = new Date(a.created_at || 0).getTime()
+          const dateB = new Date(b.created_at || 0).getTime()
+          return dateB - dateA
+        })
+      res.json(sessions)
+    }
   } catch (error) {
     console.error('Error fetching sessions:', error)
-    res.status(500).json({ error: 'Failed to fetch sessions' })
+    // Fallback to in-memory on database error
+    const sessions = Array.from(inMemorySessions.values())
+    res.json(sessions)
   }
 })
 
 // Get a single session by ID
-app.get('/api/sessions/:id', async (req: Request, res: Response) => {
+app.get('/sessions/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const result = await pool.query('SELECT * FROM sessions WHERE id = $1', [id])
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Session not found' })
+    if (dbAvailable && pool) {
+      const result = await pool.query('SELECT * FROM sessions WHERE id = $1', [id])
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Session not found' })
+      }
+
+      res.json(result.rows[0])
+    } else {
+      // Use in-memory storage as fallback
+      const session = inMemorySessions.get(id)
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' })
+      }
+      res.json(session)
     }
-
-    res.json(result.rows[0])
   } catch (error) {
     console.error('Error fetching session:', error)
-    res.status(500).json({ error: 'Failed to fetch session' })
+    // Fallback to in-memory on database error
+    const session = inMemorySessions.get(req.params.id)
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' })
+    }
+    res.json(session)
   }
 })
 
 // Create a new session
-app.post('/api/sessions', async (req: Request, res: Response) => {
+app.post('/sessions', async (req: Request, res: Response) => {
   try {
     const { id, name, request, repo, environment, output } = req.body as Session
 
@@ -90,103 +176,210 @@ app.post('/api/sessions', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing required fields' })
     }
 
-    const result = await pool.query(
-      `INSERT INTO sessions (id, name, request, repo, environment, output, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-       RETURNING *`,
-      [id, name, request, repo, environment, output || '']
-    )
+    const now = new Date().toISOString()
+    const session: Session = {
+      id,
+      name,
+      request,
+      repo,
+      environment,
+      output: output || '',
+      created_at: now,
+      updated_at: now
+    }
 
-    res.status(201).json(result.rows[0])
+    if (dbAvailable && pool) {
+      const result = await pool.query(
+        `INSERT INTO sessions (id, name, request, repo, environment, output, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+         RETURNING *`,
+        [id, name, request, repo, environment, output || '']
+      )
+      res.status(201).json(result.rows[0])
+    } else {
+      // Use in-memory storage as fallback
+      inMemorySessions.set(id, session)
+      res.status(201).json(session)
+    }
   } catch (error) {
     console.error('Error creating session:', error)
-    res.status(500).json({ error: 'Failed to create session' })
+    // Fallback to in-memory on database error
+    const { id, name, request, repo, environment, output } = req.body as Session
+    const now = new Date().toISOString()
+    const session: Session = {
+      id,
+      name,
+      request,
+      repo,
+      environment,
+      output: output || '',
+      created_at: now,
+      updated_at: now
+    }
+    inMemorySessions.set(id, session)
+    res.status(201).json(session)
   }
 })
 
 // Update a session
-app.put('/api/sessions/:id', async (req: Request, res: Response) => {
+app.put('/sessions/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params
     const { name, request, repo, environment, output } = req.body
 
-    const updates: string[] = []
-    const values: any[] = []
-    let paramCount = 1
+    if (dbAvailable && pool) {
+      const updates: string[] = []
+      const values: any[] = []
+      let paramCount = 1
 
-    if (name !== undefined) {
-      updates.push(`name = $${paramCount++}`)
-      values.push(name)
-    }
-    if (request !== undefined) {
-      updates.push(`request = $${paramCount++}`)
-      values.push(request)
-    }
-    if (repo !== undefined) {
-      updates.push(`repo = $${paramCount++}`)
-      values.push(repo)
-    }
-    if (environment !== undefined) {
-      updates.push(`environment = $${paramCount++}`)
-      values.push(environment)
-    }
-    if (output !== undefined) {
-      updates.push(`output = $${paramCount++}`)
-      values.push(output)
-    }
+      if (name !== undefined) {
+        updates.push(`name = $${paramCount++}`)
+        values.push(name)
+      }
+      if (request !== undefined) {
+        updates.push(`request = $${paramCount++}`)
+        values.push(request)
+      }
+      if (repo !== undefined) {
+        updates.push(`repo = $${paramCount++}`)
+        values.push(repo)
+      }
+      if (environment !== undefined) {
+        updates.push(`environment = $${paramCount++}`)
+        values.push(environment)
+      }
+      if (output !== undefined) {
+        updates.push(`output = $${paramCount++}`)
+        values.push(output)
+      }
 
-    if (updates.length === 0) {
-      return res.status(400).json({ error: 'No fields to update' })
+      if (updates.length === 0) {
+        return res.status(400).json({ error: 'No fields to update' })
+      }
+
+      updates.push(`updated_at = NOW()`)
+      values.push(id)
+
+      const result = await pool.query(
+        `UPDATE sessions SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+        values
+      )
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Session not found' })
+      }
+
+      res.json(result.rows[0])
+    } else {
+      // Use in-memory storage as fallback
+      const session = inMemorySessions.get(id)
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' })
+      }
+
+      if (name !== undefined) session.name = name
+      if (request !== undefined) session.request = request
+      if (repo !== undefined) session.repo = repo
+      if (environment !== undefined) session.environment = environment
+      if (output !== undefined) session.output = output
+      session.updated_at = new Date().toISOString()
+
+      inMemorySessions.set(id, session)
+      res.json(session)
     }
-
-    updates.push(`updated_at = NOW()`)
-    values.push(id)
-
-    const result = await pool.query(
-      `UPDATE sessions SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`,
-      values
-    )
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Session not found' })
-    }
-
-    res.json(result.rows[0])
   } catch (error) {
     console.error('Error updating session:', error)
-    res.status(500).json({ error: 'Failed to update session' })
+    // Fallback to in-memory on database error
+    const session = inMemorySessions.get(req.params.id)
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' })
+    }
+    const { name, request, repo, environment, output } = req.body
+    if (name !== undefined) session.name = name
+    if (request !== undefined) session.request = request
+    if (repo !== undefined) session.repo = repo
+    if (environment !== undefined) session.environment = environment
+    if (output !== undefined) session.output = output
+    session.updated_at = new Date().toISOString()
+    inMemorySessions.set(req.params.id, session)
+    res.json(session)
   }
 })
 
 // Delete a session
-app.delete('/api/sessions/:id', async (req: Request, res: Response) => {
+app.delete('/sessions/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const result = await pool.query('DELETE FROM sessions WHERE id = $1 RETURNING *', [id])
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Session not found' })
+    if (dbAvailable && pool) {
+      const result = await pool.query('DELETE FROM sessions WHERE id = $1 RETURNING *', [id])
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Session not found' })
+      }
+
+      res.json({ message: 'Session deleted successfully', session: result.rows[0] })
+    } else {
+      // Use in-memory storage as fallback
+      const session = inMemorySessions.get(id)
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' })
+      }
+      inMemorySessions.delete(id)
+      res.json({ message: 'Session deleted successfully', session })
     }
-
-    res.json({ message: 'Session deleted successfully', session: result.rows[0] })
   } catch (error) {
     console.error('Error deleting session:', error)
-    res.status(500).json({ error: 'Failed to delete session' })
+    // Fallback to in-memory on database error
+    const session = inMemorySessions.get(req.params.id)
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' })
+    }
+    inMemorySessions.delete(req.params.id)
+    res.json({ message: 'Session deleted successfully', session })
   }
 })
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', service: 'backend', timestamp: new Date().toISOString() })
+  res.json({
+    status: 'ok',
+    service: 'backend',
+    database: dbAvailable ? 'connected' : 'unavailable (using in-memory storage)',
+    storageMode: dbAvailable ? 'postgresql' : 'in-memory',
+    timestamp: new Date().toISOString()
+  })
 })
 
 // Start server
 async function start() {
-  await initDatabase()
+  console.log('🚀 Starting backend server...')
+  console.log(`📡 Port: ${PORT}`)
 
+  // Initialize database pool (non-blocking)
+  initPool()
+
+  // Try to initialize database schema (non-blocking)
+  if (pool) {
+    initDatabase().catch(err => {
+      console.error('❌ Failed to initialize database:', err)
+      console.log('⚠️  Continuing with in-memory storage')
+    })
+  }
+
+  // Start listening immediately (don't wait for database)
   app.listen(PORT, () => {
-    console.log(`🚀 Backend API server running on port ${PORT}`)
-    console.log(`📡 API available at http://localhost:${PORT}/api/sessions`)
+    console.log(`✅ Backend API server running on port ${PORT}`)
+    console.log(`📡 Routes: /sessions, /sessions/:id, /health`)
+    console.log(`📡 (accessed via reverse proxy at /api/sessions)`)
+    console.log(`💾 Storage mode: ${dbAvailable ? 'PostgreSQL' : 'In-Memory (temporary)'}`)
+
+    if (!dbAvailable) {
+      console.log('')
+      console.log('⚠️  WARNING: No database connection!')
+      console.log('⚠️  Sessions will be stored in memory and lost on restart')
+      console.log('⚠️  Set DATABASE_URL environment variable to enable persistence')
+    }
   })
 }
 

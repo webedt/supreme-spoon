@@ -14,21 +14,34 @@ interface Session {
   updatedAt?: string   // For backwards compatibility
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.PROD ? '' : 'http://localhost:3000')
+const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 const CURRENT_SESSION_KEY = 'currentSession'
 
 // Cache for sessions to avoid excessive API calls
 let sessionsCache: Session[] | null = null
 
 async function getSessions(): Promise<Session[]> {
+  const url = `${API_BASE_URL}/api/sessions`
+  console.log('DEBUG: Fetching sessions from:', url)
   try {
-    const response = await fetch(`${API_BASE_URL}/api/sessions`)
-    if (!response.ok) throw new Error('Failed to fetch sessions')
+    const response = await fetch(url)
+    console.log('DEBUG: Response status:', response.status, response.statusText)
+
+    if (!response.ok) {
+      const text = await response.text()
+      console.error('DEBUG: Response body:', text)
+      throw new Error(`Failed to fetch sessions: ${response.status} ${response.statusText}`)
+    }
+
     const sessions = await response.json()
+    console.log('DEBUG: Got sessions:', sessions.length)
     sessionsCache = sessions
     return sessions
   } catch (error) {
-    console.error('Error fetching sessions:', error)
+    console.error('ERROR: Error fetching sessions:', error)
+    if (error instanceof TypeError) {
+      console.error('ERROR: Network error - is the server running?')
+    }
     return sessionsCache || []
   }
 }
@@ -65,22 +78,36 @@ async function createSession(request: string, repo: string, environment: string,
     updated_at: new Date().toISOString()
   }
 
+  const url = `${API_BASE_URL}/api/sessions`
+  console.log('DEBUG: Creating session at:', url)
+  console.log('DEBUG: Session data:', session)
+
   try {
-    const response = await fetch(`${API_BASE_URL}/api/sessions`, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(session)
     })
 
-    if (!response.ok) throw new Error('Failed to create session')
+    console.log('DEBUG: Create response status:', response.status, response.statusText)
+
+    if (!response.ok) {
+      const text = await response.text()
+      console.error('DEBUG: Response body:', text)
+      throw new Error(`Failed to create session: ${response.status} ${response.statusText}`)
+    }
 
     const createdSession = await response.json()
+    console.log('DEBUG: Session created successfully:', createdSession.id)
     sessionsCache = null // Invalidate cache
     setCurrentSession(createdSession.id)
 
     return createdSession
   } catch (error) {
-    console.error('Error creating session:', error)
+    console.error('ERROR: Error creating session:', error)
+    if (error instanceof TypeError) {
+      console.error('ERROR: Network error - is the server running?')
+    }
     throw error
   }
 }
