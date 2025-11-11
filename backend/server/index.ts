@@ -1,6 +1,8 @@
 import express, { Request, Response } from 'express'
 import cors from 'cors'
 import { Pool } from 'pg'
+import * as fs from 'fs'
+import * as path from 'path'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -340,6 +342,144 @@ app.delete('/sessions/:id', async (req: Request, res: Response) => {
   }
 })
 
+// Helper function to parse .gitignore patterns
+function parseGitignore(gitignorePath: string): Set<string> {
+  const patterns = new Set<string>()
+
+  try {
+    if (fs.existsSync(gitignorePath)) {
+      const content = fs.readFileSync(gitignorePath, 'utf8')
+      const lines = content.split('\n')
+
+      for (const line of lines) {
+        const trimmed = line.trim()
+        // Skip empty lines and comments
+        if (trimmed && !trimmed.startsWith('#')) {
+          patterns.add(trimmed)
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error reading .gitignore:', error)
+  }
+
+  // Add common patterns that should always be ignored
+  patterns.add('node_modules')
+  patterns.add('.git')
+  patterns.add('dist')
+  patterns.add('.env')
+  patterns.add('.env.local')
+
+  return patterns
+}
+
+// Helper function to check if a path matches gitignore patterns
+function shouldIgnore(filePath: string, patterns: Set<string>): boolean {
+  const relativePath = filePath.startsWith('/') ? filePath.slice(1) : filePath
+  const parts = relativePath.split(path.sep)
+
+  for (const pattern of patterns) {
+    // Handle directory patterns
+    if (pattern.endsWith('/')) {
+      const dirPattern = pattern.slice(0, -1)
+      if (parts.includes(dirPattern)) {
+        return true
+      }
+    }
+
+    // Handle wildcard patterns
+    if (pattern.includes('*')) {
+      const regex = new RegExp('^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
+      if (parts.some(part => regex.test(part)) || regex.test(relativePath)) {
+        return true
+      }
+    }
+
+    // Handle exact matches
+    if (parts.includes(pattern) || relativePath === pattern || relativePath.endsWith('/' + pattern)) {
+      return true
+    }
+  }
+
+  return false
+}
+
+// Helper function to recursively read directory
+function readDirectoryRecursive(
+  dir: string,
+  baseDir: string,
+  patterns: Set<string>,
+  files: Array<{ path: string; content: string }> = []
+): Array<{ path: string; content: string }> {
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true })
+
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name)
+      const relativePath = path.relative(baseDir, fullPath)
+
+      // Skip if matches gitignore patterns
+      if (shouldIgnore(relativePath, patterns)) {
+        continue
+      }
+
+      if (entry.isDirectory()) {
+        readDirectoryRecursive(fullPath, baseDir, patterns, files)
+      } else if (entry.isFile()) {
+        try {
+          const content = fs.readFileSync(fullPath, 'utf8')
+          files.push({ path: relativePath, content })
+        } catch (error) {
+          // Skip binary files or files that can't be read as text
+          console.log(`Skipping file (possibly binary): ${relativePath}`)
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`Error reading directory ${dir}:`, error)
+  }
+
+  return files
+}
+
+// Get llm.txt content (repo source as text)
+app.get('/llm-txt', (req: Request, res: Response) => {
+  try {
+    // Get the repo root (go up from backend/server to repo root)
+    const repoRoot = path.resolve(__dirname, '..', '..')
+    const gitignorePath = path.join(repoRoot, '.gitignore')
+
+    // Parse .gitignore patterns
+    const patterns = parseGitignore(gitignorePath)
+
+    // Read all files
+    const files = readDirectoryRecursive(repoRoot, repoRoot, patterns)
+
+    // Sort files by path for consistent output
+    files.sort((a, b) => a.path.localeCompare(b.path))
+
+    // Format as a single text file
+    let output = '# Repository Source Code\n\n'
+    output += `Generated: ${new Date().toISOString()}\n`
+    output += `Total files: ${files.length}\n\n`
+    output += '=' .repeat(80) + '\n\n'
+
+    for (const file of files) {
+      output += `File: ${file.path}\n`
+      output += '-'.repeat(80) + '\n'
+      output += file.content
+      output += '\n\n' + '='.repeat(80) + '\n\n'
+    }
+
+    // Return as plain text
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+    res.send(output)
+  } catch (error) {
+    console.error('Error generating llm.txt:', error)
+    res.status(500).json({ error: 'Failed to generate repo source' })
+  }
+})
+
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
   res.json({
@@ -370,8 +510,8 @@ async function start() {
   // Start listening immediately (don't wait for database)
   app.listen(PORT, () => {
     console.log(`✅ Backend API server running on port ${PORT}`)
-    console.log(`📡 Routes: /sessions, /sessions/:id, /health`)
-    console.log(`📡 (accessed via reverse proxy at /api/sessions)`)
+    console.log(`📡 Routes: /sessions, /sessions/:id, /llm-txt, /health`)
+    console.log(`📡 (accessed via reverse proxy at /api/...)`)
     console.log(`💾 Storage mode: ${dbAvailable ? 'PostgreSQL' : 'In-Memory (temporary)'}`)
 
     if (!dbAvailable) {
