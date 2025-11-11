@@ -170,6 +170,7 @@ function selectTheme(themeId: string): void {
   setStoredTheme(themeId)
   applyTheme(themeId)
   updateThemeButton()
+  updateDocumentTitle()
 
   // Update the active class on theme options
   document.querySelectorAll('.theme-option').forEach(option => {
@@ -198,6 +199,15 @@ function updateThemeButton(): void {
       button.innerHTML = `${theme.icon} <span style="margin-left: 0.25rem;">▼</span>`
     }
   }
+}
+
+function updateDocumentTitle(): void {
+  const currentTheme = getCurrentTheme()
+  const theme = themes.find(t => t.id === currentTheme) || themes[0]
+  const currentPage = getCurrentPage()
+  const page = pages.find(p => p.id === currentPage) || pages[0]
+
+  document.title = `${page.title} ${theme.icon} - Example Application`
 }
 
 function toggleThemeDropdown(): void {
@@ -801,10 +811,16 @@ window.addEventListener('hashchange', () => {
   if (pageTitleElement && page) {
     pageTitleElement.textContent = page.title
   }
+
+  // Update document title with theme emoji
+  updateDocumentTitle()
 })
 
 // Render initial page
 renderPage(getCurrentPage())
+
+// Set initial document title with theme emoji
+updateDocumentTitle()
 
 // Listen for system theme changes
 window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
@@ -812,5 +828,6 @@ window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e
   if (!getStoredTheme()) {
     applyTheme(e.matches ? 'light' : 'dark')
     updateThemeButton()
+    updateDocumentTitle()
   }
 })
