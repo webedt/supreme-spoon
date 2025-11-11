@@ -586,6 +586,47 @@ app.get('/llm-txt', (req: Request, res: Response) => {
   }
 })
 
+// Reset admin endpoint (TEMPORARY - UNSECURED FOR DEVELOPMENT ONLY)
+// WARNING: This endpoint has NO authentication and should be removed in production!
+app.post('/reset-admin', async (req: Request, res: Response) => {
+  try {
+    if (!pool || !dbAvailable) {
+      return res.status(503).json({ error: 'Database not available' })
+    }
+
+    // Delete all existing admin users
+    await pool.query(`DELETE FROM users WHERE role = 'admin'`)
+
+    // Create new admin user with random password
+    const defaultPassword = generateRandomPassword()
+    const passwordHash = await hashPassword(defaultPassword)
+    const adminId = uuidv4()
+
+    await pool.query(`
+      INSERT INTO users (id, email, password_hash, role, name)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [adminId, 'admin@webedt.com', passwordHash, 'admin', 'Admin User'])
+
+    console.log('')
+    console.log('🔐 ═══════════════════════════════════════════════════════')
+    console.log('🔐 ADMIN PASSWORD RESET')
+    console.log('🔐 ═══════════════════════════════════════════════════════')
+    console.log('🔐 Email:    admin@webedt.com')
+    console.log(`🔐 Password: ${defaultPassword}`)
+    console.log('🔐 ═══════════════════════════════════════════════════════')
+    console.log('')
+
+    res.json({
+      message: 'Admin password reset successfully',
+      email: 'admin@webedt.com',
+      password: defaultPassword
+    })
+  } catch (error) {
+    console.error('Reset admin error:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
   res.json({
