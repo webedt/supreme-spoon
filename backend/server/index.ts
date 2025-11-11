@@ -588,6 +588,52 @@ app.get('/llm-txt', (req: Request, res: Response) => {
 
 // Reset admin endpoint (TEMPORARY - UNSECURED FOR DEVELOPMENT ONLY)
 // WARNING: This endpoint has NO authentication and should be removed in production!
+
+// GET endpoint - returns instructions
+app.get('/reset-admin', (req: Request, res: Response) => {
+  const instructions = `
+Admin Password Reset Endpoint
+==============================
+
+⚠️  WARNING: This endpoint is UNSECURED and for DEVELOPMENT ONLY!
+⚠️  Remove or secure this endpoint before production deployment!
+
+How to Use:
+-----------
+
+To reset the admin password, send a POST request to this endpoint.
+
+Using curl:
+  curl -X POST ${req.protocol}://${req.get('host')}/api/reset-admin
+
+Using JavaScript (browser console):
+  fetch('/api/reset-admin', { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+      console.log('Email:', data.email)
+      console.log('Password:', data.password)
+    })
+
+Using Postman/Insomnia:
+  Method: POST
+  URL: ${req.protocol}://${req.get('host')}/api/reset-admin
+
+Response:
+---------
+{
+  "message": "Admin password reset successfully",
+  "email": "admin@webedt.com",
+  "password": "randomly-generated-password"
+}
+
+The password will also be logged to the server console.
+`
+
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+  res.send(instructions)
+})
+
+// POST endpoint - performs the reset
 app.post('/reset-admin', async (req: Request, res: Response) => {
   try {
     if (!pool || !dbAvailable) {
