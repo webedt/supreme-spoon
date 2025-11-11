@@ -1,0 +1,199 @@
+/* Theme Definitions */
+
+/* Light Theme */
+:root.light {
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', sans-serif;
+  --bg-color: #ffffff;
+  --bg-secondary: #f6f8fa;
+  --bg-tertiary: #eaeef2;
+  --text-color: #24292f;
+  --text-secondary: #57606a;
+  --text-muted: #6e7781;
+  --button-bg: #f6f8fa;
+  --button-hover: #eaeef2;
+  --accent-color: #0969da;
+  --accent-hover: #0550ae;
+  --header-bg: #f6f8fa;
+  --toggle-bg: #eaeef2;
+  --toggle-hover: #d0d7de;
+  --sidebar-bg: #ffffff;
+  --sidebar-hover: #f6f8fa;
+  --sidebar-active: #0969da;
+  --border-color: #d0d7de;
+  --success-color: #1a7f37;
+  --warning-color: #bf8700;
+  --error-color: #cf222e;
+}
+
+/* Blue Ocean Theme */
+:root.blue {
+  --font-family: 'Trebuchet MS', 'Lucida Sans Unicode', sans-serif;
+  --bg-color: #0a1929;
+  --bg-secondary: #0d2438;
+  --bg-tertiary: #132f4c;
+  --text-color: #b2bac2;
+  --text-secondary: #8b959e;
+  --text-muted: #6e7781;
+  --button-bg: #132f4c;
+  --button-hover: #1e4976;
+  --accent-color: #3399ff;
+  --accent-hover: #66b2ff;
+  --header-bg: #0d1f2d;
+  --toggle-bg: #1e4976;
+  --toggle-hover: #2868a8;
+  --sidebar-bg: #0d1f2d;
+  --sidebar-hover: #1e3a52;
+  --sidebar-active: #3399ff;
+  --border-color: #1e4976;
+  --success-color: #4caf50;
+  --warning-color: #ff9800;
+  --error-color: #f44336;
+}
+
+/* Purple Dream Theme */
+:root.purple {
+  --font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+  --bg-color: #1a0a2e;
+  --bg-secondary: #240e3f;
+  --bg-tertiary: #2d1b4e;
+  --text-color: #d4c5e5;
+  --text-secondary: #a896c0;
+  --text-muted: #8b7aa0;
+  --button-bg: #2d1b4e;
+  --button-hover: #3e2059;
+  --accent-color: #a855f7;
+  --accent-hover: #c084fc;
+  --header-bg: #16082a;
+  --toggle-bg: #3e2059;
+  --toggle-hover: #5a2e7a;
+  --sidebar-bg: #16082a;
+  --sidebar-hover: #2d1b4e;
+  --sidebar-active: #a855f7;
+  --border-color: #3e2059;
+  --success-color: #8b5cf6;
+  --warning-color: #f59e0b;
+  --error-color: #ef4444;
+}
+
+/* Forest Green Theme */
+:root.green {
+  --font-family: 'Courier New', Courier, monospace;
+  --bg-color: #0d1b0d;
+  --bg-secondary: #132713;
+  --bg-tertiary: #1a2e1a;
+  --text-color: #c5e5c5;
+  --text-secondary: #9ac29a;
+  --text-muted: #7a9f7a;
+  --button-bg: #1a2e1a;
+  --button-hover: #1e3d1e;
+  --accent-color: #22c55e;
+  --accent-hover: #4ade80;
+  --header-bg: #0a150a;
+  --toggle-bg: #1e3d1e;
+  --toggle-hover: #2d5a2d;
+  --sidebar-bg: #0a150a;
+  --sidebar-hover: #1a2e1a;
+  --sidebar-active: #22c55e;
+  --border-color: #1e3d1e;
+  --success-color: #22c55e;
+  --warning-color: #eab308;
+  --error-color: #ef4444;
+}
+
+/* Sunset Orange Theme */
+:root.sunset {
+  --font-family: Georgia, 'Times New Roman', Times, serif;
+  --bg-color: #1f1108;
+  --bg-secondary: #2a1609;
+  --bg-tertiary: #331b0a;
+  --text-color: #f5d5b8;
+  --text-secondary: #d4b499;
+  --text-muted: #b39379;
+  --button-bg: #331b0a;
+  --button-hover: #4a2611;
+  --accent-color: #f97316;
+  --accent-hover: #fb923c;
+  --header-bg: #1a0d06;
+  --toggle-bg: #4a2611;
+  --toggle-hover: #663619;
+  --sidebar-bg: #1a0d06;
+  --sidebar-hover: #331b0a;
+  --sidebar-active: #f97316;
+  --border-color: #4a2611;
+  --success-color: #22c55e;
+  --warning-color: #f59e0b;
+  --error-color: #dc2626;
+}
+
+/* Rose Pink Theme */
+:root.rose {
+  --font-family: 'Gill Sans', 'Gill Sans MT', Calibri, sans-serif;
+  --bg-color: #1f0a14;
+  --bg-secondary: #2a0e1c;
+  --bg-tertiary: #331525;
+  --text-color: #f5c5d8;
+  --text-secondary: #d4a4b9;
+  --text-muted: #b38399;
+  --button-bg: #331525;
+  --button-hover: #4a1f2e;
+  --accent-color: #f43f5e;
+  --accent-hover: #fb7185;
+  --header-bg: #1a0810;
+  --toggle-bg: #4a1f2e;
+  --toggle-hover: #662940;
+  --sidebar-bg: #1a0810;
+  --sidebar-hover: #331525;
+  --sidebar-active: #f43f5e;
+  --border-color: #4a1f2e;
+  --success-color: #22c55e;
+  --warning-color: #f59e0b;
+  --error-color: #dc2626;
+}
+
+/* Retro Gaming Theme */
+:root.retro {
+  --font-family: 'Courier New', 'Lucida Console', Monaco, monospace;
+  --bg-color: #0f0f23;
+  --bg-secondary: #14142e;
+  --bg-tertiary: #1a1a2e;
+  --text-color: #00ff41;
+  --text-secondary: #00cc34;
+  --text-muted: #009928;
+  --button-bg: #1a1a2e;
+  --button-hover: #2a2a3e;
+  --accent-color: #ff10f0;
+  --accent-hover: #ff40ff;
+  --header-bg: #0a0a1a;
+  --toggle-bg: #2a2a3e;
+  --toggle-hover: #3a3a5e;
+  --sidebar-bg: #0a0a1a;
+  --sidebar-hover: #1a1a2e;
+  --sidebar-active: #ff10f0;
+  --border-color: #00ff41;
+  --success-color: #00ff41;
+  --warning-color: #ffff00;
+  --error-color: #ff0000;
+}
+
+/* Support system preference as fallback */
+@media (prefers-color-scheme: light) {
+  :root:not(.dark):not(.light):not(.blue):not(.purple):not(.green):not(.sunset):not(.rose):not(.retro) {
+    --bg-color: #ffffff;
+    --bg-secondary: #f6f8fa;
+    --bg-tertiary: #eaeef2;
+    --text-color: #24292f;
+    --text-secondary: #57606a;
+    --text-muted: #6e7781;
+    --button-bg: #f6f8fa;
+    --button-hover: #eaeef2;
+    --accent-color: #0969da;
+    --accent-hover: #0550ae;
+    --header-bg: #f6f8fa;
+    --toggle-bg: #eaeef2;
+    --toggle-hover: #d0d7de;
+    --sidebar-bg: #ffffff;
+    --sidebar-hover: #f6f8fa;
+    --sidebar-active: #0969da;
+    --border-color: #d0d7de;
+  }
+}
