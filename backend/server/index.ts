@@ -586,6 +586,58 @@ app.get('/llm-txt', (req: Request, res: Response) => {
   }
 })
 
+// Admin password reset endpoint (protected by environment variable)
+app.post('/reset-admin', async (req: Request, res: Response) => {
+  try {
+    // Check if reset token matches environment variable
+    const resetToken = req.headers['x-reset-token']
+    const expectedToken = process.env.ADMIN_RESET_TOKEN
+
+    if (!expectedToken) {
+      return res.status(404).json({ error: 'Endpoint not available' })
+    }
+
+    if (resetToken !== expectedToken) {
+      return res.status(401).json({ error: 'Invalid reset token' })
+    }
+
+    if (!pool || !dbAvailable) {
+      return res.status(503).json({ error: 'Database not available' })
+    }
+
+    // Delete existing admin users
+    await pool.query(`DELETE FROM users WHERE role = 'admin'`)
+
+    // Create new admin user
+    const defaultPassword = generateRandomPassword()
+    const passwordHash = await hashPassword(defaultPassword)
+    const adminId = uuidv4()
+
+    await pool.query(`
+      INSERT INTO users (id, email, password_hash, role, name)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [adminId, 'admin@example.com', passwordHash, 'admin', 'Admin User'])
+
+    console.log('')
+    console.log('🔐 ═══════════════════════════════════════════════════════')
+    console.log('🔐 ADMIN PASSWORD RESET')
+    console.log('🔐 ═══════════════════════════════════════════════════════')
+    console.log('🔐 Email:    admin@example.com')
+    console.log(`🔐 Password: ${defaultPassword}`)
+    console.log('🔐 ═══════════════════════════════════════════════════════')
+    console.log('')
+
+    res.json({
+      message: 'Admin password reset successfully',
+      email: 'admin@example.com',
+      password: defaultPassword
+    })
+  } catch (error) {
+    console.error('Reset admin error:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
   res.json({
