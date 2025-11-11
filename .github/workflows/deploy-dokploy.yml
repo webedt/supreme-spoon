@@ -476,6 +476,84 @@ jobs:
           echo "  - Environment: ${DOKPLOY_ENVIRONMENT_ID}"
 
 
+      - name: Configure Environment Variables
+        env:
+          DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          APPLICATION_ID: ${{ steps.dokploy_app.outputs.application_id }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: |
+          # Strip trailing slash from DOKPLOY_URL if present
+          DOKPLOY_URL="${DOKPLOY_URL%/}"
+
+          echo "🔧 Configuring environment variables..."
+
+          # Build environment variable string
+          ENV_VARS=""
+          ENV_COUNT=0
+
+          # Add DATABASE_URL if it exists
+          if [ -n "$DATABASE_URL" ]; then
+            if [ -n "$ENV_VARS" ]; then
+              ENV_VARS="${ENV_VARS}\n"
+            fi
+            ENV_VARS="${ENV_VARS}DATABASE_URL=${DATABASE_URL}"
+            echo "  ✅ DATABASE_URL configured"
+            ENV_COUNT=$((ENV_COUNT + 1))
+          fi
+
+          # Add JWT_SECRET if it exists (optional, will auto-generate if not set)
+          if [ -n "$JWT_SECRET" ]; then
+            if [ -n "$ENV_VARS" ]; then
+              ENV_VARS="${ENV_VARS}\n"
+            fi
+            ENV_VARS="${ENV_VARS}JWT_SECRET=${JWT_SECRET}"
+            echo "  ✅ JWT_SECRET configured"
+            ENV_COUNT=$((ENV_COUNT + 1))
+          fi
+
+          # Always set NODE_ENV to development (per CLAUDE.md requirements)
+          if [ -n "$ENV_VARS" ]; then
+            ENV_VARS="${ENV_VARS}\n"
+          fi
+          ENV_VARS="${ENV_VARS}NODE_ENV=development"
+          echo "  ✅ NODE_ENV=development configured"
+          ENV_COUNT=$((ENV_COUNT + 1))
+
+          # Update application environment variables if any were configured
+          if [ "$ENV_COUNT" -gt 0 ]; then
+            echo ""
+            echo "📝 Setting ${ENV_COUNT} environment variable(s)..."
+
+            UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X 'POST' \
+              "${DOKPLOY_URL}/api/trpc/application.update" \
+              -H 'accept: application/json' \
+              -H 'Content-Type: application/json' \
+              -H "x-api-key: ${DOKPLOY_API_KEY}" \
+              -d "{
+                \"json\": {
+                  \"applicationId\": \"${APPLICATION_ID}\",
+                  \"env\": \"${ENV_VARS}\"
+                }
+              }")
+
+            UPDATE_HTTP_CODE=$(echo "$UPDATE_RESPONSE" | tail -n1)
+            UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '$d')
+
+            if [ "$UPDATE_HTTP_CODE" -ge 200 ] && [ "$UPDATE_HTTP_CODE" -lt 300 ]; then
+              echo "✅ Environment variables configured successfully"
+            else
+              echo "⚠️  Warning: Failed to set environment variables (HTTP ${UPDATE_HTTP_CODE})"
+              echo "Response: ${UPDATE_BODY}"
+              echo "Application will use default/in-memory configuration"
+            fi
+          else
+            echo "ℹ️  No environment variables configured"
+            echo "Application will use in-memory storage and defaults"
+          fi
+          echo ""
+
       - name: Deploy to Dokploy
         if: steps.dokploy_app.outputs.app_created == 'true'
         env:
